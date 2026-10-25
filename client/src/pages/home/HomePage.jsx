@@ -31,12 +31,17 @@ function Hero() {
   return (
     <section className="grid items-center gap-8 rounded-[36px] bg-panel p-8 md:grid-cols-2 md:p-12">
       <div>
-        <h1 className="font-serif text-5xl leading-tight md:text-6xl">
-          Easy pieces <span className="block italic text-highlight">for every day.</span>
-        </h1>
-        <p className="mt-4 max-w-md text-ink-soft">
-          Soft knits, ribbed jerseys and flowing dresses, picked for easy everyday wear.
-        </p>
+        {/* Slogan 1. motion-safe: no animation at all when the visitor asks for reduced motion.
+            w-fit: the reveal crosses the text itself, not empty space beside it. p-3 with -m-3 makes the masked
+            box a bit larger than the text, so italic tails are not cut, and changes nothing in the layout. */}
+        <div className="-m-3 w-fit p-3 motion-safe:animate-reveal">
+          <h1 className="font-serif text-5xl leading-tight md:text-6xl">
+            Easy pieces <span className="block italic text-highlight">for every day.</span>
+          </h1>
+          <p className="mt-4 max-w-md text-ink-soft">
+            Soft knits, ribbed jerseys and flowing dresses, picked for easy everyday wear.
+          </p>
+        </div>
         <div className="mt-6 flex flex-wrap items-center gap-4">
           <Button to="/shop">Shop now</Button>
           <Link to="/shop?sort=newest" className="text-sm underline underline-offset-4">
@@ -94,7 +99,8 @@ function ProductTabs() {
 
   return (
     <section className="mt-16">
-      <h2 className="text-center font-serif text-4xl">
+      {/* Slogan 2: same reveal, starting 0.4s after the first (same padding and negative margin as slogan 1). */}
+      <h2 className="-my-2 mx-auto w-fit px-2 py-2 text-center font-serif text-4xl motion-safe:animate-reveal motion-safe:[animation-delay:400ms]">
         Dressed up, dressed down, <span className="italic text-highlight">dressed for you.</span>
       </h2>
 

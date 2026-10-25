@@ -1,3 +1,4 @@
+import { colorGroupFor } from '../../src/utils/color-groups.js';
 import { cleanColor, cleanSize } from './clean.js';
 import { parseDescription } from './parse-description.js';
 
@@ -39,7 +40,14 @@ function mapVariants(source, warn) {
       return;
     }
     seen.add(key);
-    variants.push({ sku: v.sku, color_name: colorName, size, position, stock: v.in_stock ? IN_STOCK : 0 });
+    variants.push({
+      sku: v.sku,
+      color_name: colorName,
+      color_group: colorGroupFor(colorName),
+      size,
+      position,
+      stock: v.in_stock ? IN_STOCK : 0,
+    });
   });
   return variants;
 }

@@ -12,6 +12,8 @@ export function getProducts(params = {}) {
   return api(`/products${queryString ? `?${queryString}` : ''}`);
 }
 
+export const getFilters = () => api('/filters');
+
 export const getProduct = (slug) => api(`/products/${encodeURIComponent(slug)}`);
 
 export const getRelatedProducts = (slug) => api(`/products/${encodeURIComponent(slug)}/related`);

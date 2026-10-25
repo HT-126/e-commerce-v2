@@ -72,6 +72,7 @@ One row per color and size. Stock lives here.
 | sku | varchar(40) | unique |
 | color_name | varchar(60) | cleaned name, see `dataset.md` |
 | size | varchar(20) | cleaned value, for example `M`, `2XL`, `One Size`, `8`, `16W` |
+| color_group | varchar(20) | base color for the shop filter (`black`, `white`, ..., `other`), from `color_name` with the rules in `dataset.md`. Default `other` |
 | position | smallint unsigned | display order inside the product |
 | stock | int unsigned | default 0. Add `CHECK (stock >= 0)` |
 
@@ -137,7 +138,7 @@ Unique key: (`product_id`, `user_id`).
 
 ## Indexes
 - `products`: (`category_id`, `is_active`), (`price_cents`), (`created_at`), (`rating_avg`).
-- `variants`: (`product_id`).
+- `variants`: (`product_id`), (`product_id`, `color_group`, `size`) for the shop filters.
 - `order_items`: (`order_id`), (`product_id`).
 - `orders`: (`user_id`, `created_at`), (`status`).
 - `reviews`: (`product_id`, `created_at`).

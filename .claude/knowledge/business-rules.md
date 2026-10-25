@@ -112,6 +112,11 @@ Merge when the user signs in or registers:
 - Admin can delete any review (for spam).
 
 ## Catalog and filters
+- Shop filters: Color (several color groups), Size (several sizes) and Price (one range). They combine with each other, with the category, the search text and the sort.
+- Color and Size match **in-stock variants only**: a product shows when one of its variants has stock, is in a chosen color group and has a chosen size (both on the same variant). With neither filter, sold-out products still show, as sold out.
+- Price ranges: Under $25, $25-$50, $50-$75, $75-$100, $100+. The lower limit is included, the upper limit is not (`$25-$50` = 2500 to 4999 cents).
+- "Clear filters" resets Color, Size, Price and the search text. The category and the sort stay.
+- Filters live in the URL, so a refresh or a shared link shows the same list. Changing a filter goes back to page 1.
 - Inactive products (`is_active = false`) never appear on customer pages or in carts as buyable.
 - Home tabs: New arrivals = newest `created_at` first. Top rated = highest `rating_avg` first, then higher `review_count`, products with no rating last. Under $45 = `price_cents < 4500`.
 - Any claim on Home like "Rated 4.7 or higher" must be computed from data, or removed.

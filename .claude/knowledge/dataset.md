@@ -17,7 +17,7 @@ The repo updates every Sunday. Always import the same version so seeds give the 
 - Stock: only `in_stock` (true/false). No stock numbers.
 - Colors: names only, no color codes. Many spellings (`BLACK/MAUVE`, `Ash Mocha`, `AS SHOWN`).
 - `description` (plain text) is the HTML with tags removed, so tables and headings run together. Do not show it. Use `description_html` and parse it (below).
-- Size chart: 2,178 of the 2,242 kept products have one `<table>` inside `description_html` (first header `Size`, then columns such as Bust, Waist, Hip, Length; values in inches). Columns differ per product.
+- Size chart: 2,178 of the 2,242 kept products have one `<table>` inside `description_html`. In 2,174 of them the first header is `Size` (then columns such as Bust, Waist, Hip, Length; values in inches), and those become `size_chart`. The other 4 tables are not size charts (3 are model measurements, 1 is a bikini-set table), so they are ignored. Columns differ per product.
 - Ratings: `reviews: { rating, count }` aggregate only, no review texts. Some products have `rating: null`.
 - Images: 1 to 8 per product, hosted on Shopify's CDN (not in the repo). Each has `url`, `alt`, `width`, `height`.
 
@@ -71,6 +71,12 @@ Header menu order = table order.
 - Color: trim, then Title Case each word and each part around `/` and `-` (`BLACK/MAUVE` becomes `Black/Mauve`). Keep the meaning, do not merge different colors.
 - Size: trim, then only these fixes: `One size`, `onesize` to `One Size`; `XXL` to `2XL`; `XXXL` to `3XL`; `SM` to `S/M`; `ML` to `M/L`. Keep every other value as it is (number sizes like `8`, `0(24)` and plus sizes like `16W` are real sizes).
 - If cleaning makes two variants of one product equal (same color and size), keep the first and log a warning.
+
+## Color groups (for the shop filter)
+`variants.color_group` is set from the cleaned `color_name` by `colorGroupFor()` in `server/src/utils/color-groups.js` (the seed, the migration backfill and, later, admin use the same function).
+- Groups, in display order: `black`, `white`, `neutral` (beige, cream, ivory, khaki, tan, camel, taupe, mocha, sand...), `brown`, `gray`, `red` (red, burgundy, wine, scarlet...), `pink`, `orange`, `yellow`, `green`, `blue` (navy, teal, turquoise...), `purple`, `multicolor` (floral, leopard, print, multicolor...), `other`.
+- Ordered keyword rules. For names like `Black/Mauve` the first part decides; if it matches nothing, the next part is tried. Anything unmatched is `other`.
+- Goal: `other` stays under about 5% of variants. Measured on the pinned dataset: 260 of 17,022 variants (1.5%), all names that carry no color (`Medium`, `Light`, `Dark`, `Color`, `As Shown`...).
 
 ## Seed rules
 - Seed script order: categories, products, images, variants, users, demo order. Insert in batches (`knex.batchInsert`, 500 rows).

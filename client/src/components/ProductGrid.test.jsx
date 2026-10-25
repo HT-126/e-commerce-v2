@@ -40,8 +40,28 @@ describe('ProductGrid', () => {
     });
 
     expect(screen.getByRole('link', { name: /Blue Dress/ })).toHaveAttribute('href', '/products/blue-dress');
-    expect(screen.getByText('$44.99 · 4.8 ★ (7)')).toBeInTheDocument();
-    expect(screen.getByText('$44.99', { exact: true })).toBeInTheDocument();
+    expect(screen.getAllByText('$44.99')).toHaveLength(2);
+    expect(screen.getByText('4.8 (7)')).toBeInTheDocument();
+    expect(screen.getByText('Rated 4.8 out of 5 from 7 reviews')).toBeInTheDocument();
+  });
+
+  it('shows an action under the empty message when one is given', () => {
+    const onClick = vi.fn();
+    renderGrid({
+      items: [],
+      emptyMessage: 'Nothing here.',
+      emptyAction: <button onClick={onClick}>Clear it</button>,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear it' }));
+
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('shows no action when there is none', () => {
+    renderGrid({ items: [], emptyMessage: 'Nothing here.' });
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('marks a sold-out product', () => {

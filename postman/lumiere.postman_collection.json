@@ -237,6 +237,259 @@
           }
         },
         {
+          "name": "Filter options",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"color groups have a key and a label\", () => { pm.expect(data.colors.length).to.be.above(0); data.colors.forEach((c) => pm.expect(c).to.have.all.keys(\"key\", \"label\")); });",
+                  "pm.test(\"sizes are text, starting with the usual letter sizes\", () => { pm.expect(data.sizes.length).to.be.above(0); data.sizes.forEach((s) => pm.expect(s).to.be.a(\"string\")); pm.expect(data.sizes.indexOf(\"S\")).to.be.below(data.sizes.indexOf(\"XL\")); });",
+                  "const keys = (v) => Array.isArray(v) ? v.flatMap(keys) : (v && typeof v === \"object\") ? Object.entries(v).flatMap(([k, x]) => [k, ...keys(x)]) : [];",
+                  "pm.test(\"no stock number in the response\", () => pm.expect(keys(pm.response.json())).to.not.include(\"stock\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/filters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "filters"
+              ]
+            },
+            "description": "Color groups and sizes for the shop filters. Sizes come in a fixed order. No stock numbers."
+          }
+        },
+        {
+          "name": "Filter: color black",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"some products, fewer than all 2242\", () => { pm.expect(data.total).to.be.above(0); pm.expect(data.total).to.be.below(2242); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?color=black&limit=8",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "color",
+                  "value": "black"
+                },
+                {
+                  "key": "limit",
+                  "value": "8"
+                }
+              ]
+            },
+            "description": "Only products with an in-stock black variant."
+          }
+        },
+        {
+          "name": "Filter: several colors and sizes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"some products\", () => pm.expect(pm.response.json().data.total).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?color=black,white&size=S,M&limit=8",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "color",
+                  "value": "black,white"
+                },
+                {
+                  "key": "size",
+                  "value": "S,M"
+                },
+                {
+                  "key": "limit",
+                  "value": "8"
+                }
+              ]
+            },
+            "description": "Black or white, in size S or M (on the same in-stock variant)."
+          }
+        },
+        {
+          "name": "Filter: black, M, $25-$50, cheapest first",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().data.items;",
+                  "pm.test(\"prices are 2500 to 4999\", () => items.forEach((p) => { pm.expect(p.priceCents).to.be.at.least(2500); pm.expect(p.priceCents).to.be.at.most(4999); }));",
+                  "pm.test(\"prices go up\", () => items.forEach((p, i) => { if (i > 0) pm.expect(p.priceCents).to.be.at.least(items[i - 1].priceCents); }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?color=black&size=M&minPriceCents=2500&maxPriceCents=4999&sort=price_asc&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "color",
+                  "value": "black"
+                },
+                {
+                  "key": "size",
+                  "value": "M"
+                },
+                {
+                  "key": "minPriceCents",
+                  "value": "2500"
+                },
+                {
+                  "key": "maxPriceCents",
+                  "value": "4999"
+                },
+                {
+                  "key": "sort",
+                  "value": "price_asc"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "All filters together. Prices are inside the range and go up."
+          }
+        },
+        {
+          "name": "Filter: unknown color gives an empty list",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"empty list\", () => { const data = pm.response.json().data; pm.expect(data.items).to.have.lengthOf(0); pm.expect(data.total).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?color=no-such-color",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "color",
+                  "value": "no-such-color"
+                }
+              ]
+            },
+            "description": "Not an error: just no products."
+          }
+        },
+        {
+          "name": "Error: minimum price above maximum",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code is VALIDATION_ERROR\", () => pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?minPriceCents=5000&maxPriceCents=2500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "minPriceCents",
+                  "value": "5000"
+                },
+                {
+                  "key": "maxPriceCents",
+                  "value": "2500"
+                }
+              ]
+            },
+            "description": "Expect 400 VALIDATION_ERROR."
+          }
+        },
+        {
           "name": "Error: limit above 48",
           "event": [
             {

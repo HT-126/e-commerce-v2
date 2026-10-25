@@ -62,6 +62,30 @@
 
   --font-serif: 'Newsreader', serif;
   --font-sans: 'Instrument Sans', sans-serif;
+
+  /* Home slogans: they fade in from left to right, once, over 1.2s. A mask (one soft-edged gradient, 2.5 times
+     as wide as the text) slides across: the text is hidden where the mask is transparent and shown where it is
+     opaque, so the edge between them is soft.
+     - `backwards`: the first keyframe applies from the first paint and during a delay, so the text is hidden
+       before it starts (no flash).
+     - The mask lives only inside the keyframes. When the animation ends the element has no mask at all, so
+       nothing is left behind that could clip italic overhangs. The last frame is fully opaque, so there is no jump.
+     - The text stays real text: a mask only changes how it is painted. */
+  --animate-reveal: reveal 1.2s ease-out backwards;
+  @keyframes reveal {
+    from {
+      mask-image: linear-gradient(90deg, #000 45%, transparent 55%);
+      mask-size: 250% 100%;
+      mask-repeat: no-repeat;
+      mask-position: 100% 0;
+    }
+    to {
+      mask-image: linear-gradient(90deg, #000 45%, transparent 55%);
+      mask-size: 250% 100%;
+      mask-repeat: no-repeat;
+      mask-position: 0 0;
+    }
+  }
 }
 
 body {

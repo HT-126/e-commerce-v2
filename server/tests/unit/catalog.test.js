@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeLike, productOrder, variantOptions } from '../../src/utils/catalog.js';
+import { escapeLike, productOrder, sortSizes, variantOptions } from '../../src/utils/catalog.js';
 import { getProductSchema, listProductsSchema } from '../../src/schemas/products.schema.js';
 
 describe('escapeLike', () => {
@@ -78,5 +78,89 @@ describe('getProductSchema', () => {
   it('needs a slug', () => {
     expect(getProductSchema.safeParse({}).success).toBe(false);
     expect(getProductSchema.safeParse({ slug: 'a-dress' }).success).toBe(true);
+  });
+});
+
+describe('sortSizes', () => {
+  it('puts letter sizes in order, One Size after them, then number sizes in natural order', () => {
+    const sizes = ['10', 'One Size', 'XL', '4', 'S', '2XL', 'M', '16W', 'XS', '8', 'L', '3XL', '9(29)'];
+
+    expect(sortSizes(sizes)).toEqual([
+      'XS',
+      'S',
+      'M',
+      'L',
+      'XL',
+      '2XL',
+      '3XL',
+      'One Size',
+      '4',
+      '8',
+      '9(29)',
+      '10',
+      '16W',
+    ]);
+  });
+
+  it('orders combined and plus sizes next to their neighbours', () => {
+    expect(sortSizes(['L', 'S/M', 'XL', 'M/L', 'S', 'M', 'L/XL'])).toEqual([
+      'S',
+      'S/M',
+      'M',
+      'M/L',
+      'L',
+      'L/XL',
+      'XL',
+    ]);
+  });
+
+  it('does not change the list it is given', () => {
+    const sizes = ['L', 'S'];
+    sortSizes(sizes);
+
+    expect(sizes).toEqual(['L', 'S']);
+  });
+});
+
+describe('listProductsSchema filters', () => {
+  it('turns comma lists into arrays: trimmed, no empty parts, no duplicates', () => {
+    const parsed = listProductsSchema.parse({ color: ' Black, white ,,black', size: 'M, L,M' });
+
+    expect(parsed.color).toEqual(['black', 'white']);
+    expect(parsed.size).toEqual(['M', 'L']);
+  });
+
+  it('keeps the case of sizes and lower-cases color keys', () => {
+    const parsed = listProductsSchema.parse({ color: 'BLACK', size: '2XL,One Size' });
+
+    expect(parsed.color).toEqual(['black']);
+    expect(parsed.size).toEqual(['2XL', 'One Size']);
+  });
+
+  it('treats empty lists as not sent', () => {
+    expect(listProductsSchema.parse({ color: '', size: '' })).toEqual({ sort: 'newest', page: 1, limit: 12 });
+    expect(listProductsSchema.parse({ color: ',' }).color).toEqual([]);
+  });
+
+  it('allows up to 15 colors and 20 sizes, not more', () => {
+    const many = (n) => Array.from({ length: n }, (_, i) => `v${i}`).join(',');
+
+    expect(listProductsSchema.safeParse({ color: many(15) }).success).toBe(true);
+    expect(listProductsSchema.safeParse({ color: many(16) }).success).toBe(false);
+    expect(listProductsSchema.safeParse({ size: many(20) }).success).toBe(true);
+    expect(listProductsSchema.safeParse({ size: many(21) }).success).toBe(false);
+  });
+
+  it('rejects an item longer than 20 characters', () => {
+    expect(listProductsSchema.safeParse({ size: 'a'.repeat(21) }).success).toBe(false);
+  });
+
+  it('accepts a price range, and rejects a minimum above the maximum', () => {
+    expect(listProductsSchema.safeParse({ minPriceCents: '2500', maxPriceCents: '4999' }).success).toBe(true);
+    expect(listProductsSchema.safeParse({ minPriceCents: '5000', maxPriceCents: '5000' }).success).toBe(true);
+    expect(listProductsSchema.safeParse({ minPriceCents: '5000', maxPriceCents: '4999' }).success).toBe(
+      false,
+    );
+    expect(listProductsSchema.safeParse({ minPriceCents: '5000' }).success).toBe(true);
   });
 });
