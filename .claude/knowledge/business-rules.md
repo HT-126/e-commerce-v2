@@ -15,6 +15,7 @@ Exact rules for money, stock, reviews and status. Code must follow these. Do not
 - No shipping address is collected. This is a demo store: no real delivery.
 - Free shipping when the subtotal is `>= 9700` cents ($97.00).
 - Below that: flat `695` cents ($6.95).
+- A cart with no `ok` line (empty, or only sold-out lines) has shipping `0`.
 
 ## Returns
 - "7-day returns" is shown as text only. There is no return flow.
