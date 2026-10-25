@@ -93,26 +93,34 @@ Options for the shop filters.
 
 ## Reviews
 
+`review` = `{ rating, comment, createdAt }` (`comment` is `null` for a rating only). The shown `ratingAvg` and `reviewCount` follow the formula in `business-rules.md` and are recomputed in the same transaction as every create, update and delete.
+
 ### `GET /api/products/:slug/reviews`
-- Query: `page` (default 1), `limit` (default 10, max 50)
-- Response `200`: `{ data: { items: [{ id, rating, comment, authorName, createdAt }], page, limit, total } }`
-- Only reviews with a comment. `authorName` = first name + last initial ("Anna K.").
+- Query: `page` (default 1, max 10000), `limit` (default 10, max 50)
+- Response `200`: `{ data: { items: [{ id, rating, comment, authorName, createdAt }], page, limit, total } }`, newest first.
+- Only reviews with a comment, so `total` counts those (not the shown `reviewCount`). `authorName` = first name + last initial ("Anna K.").
+- Errors: `400`, `404` (unknown or inactive product)
+- Schema: `getProductSchema` (params), `listReviewsSchema` (query)
 
 ### `GET /api/products/:slug/reviews/mine`
 - Auth: required. Response `200`: `{ data: { review: review | null, canReview: boolean } }`
 - `canReview` is true when the user has a `delivered` order for this product.
+- Errors: `401`, `404`
+- Schema: `getProductSchema` (params)
 
 ### `PUT /api/products/:slug/reviews/mine`
-Creates or updates the signed-in user's review.
+Creates or updates the signed-in user's review (one per user per product).
 - Auth: required
-- Request: `{ rating: 1-5, comment?: string (max 1000) | null }`
-- Rules: the user must have a `delivered` order for this product (`business-rules.md`).
+- Request: `{ rating: 1-5 (whole number), comment?: string (max 1000) | null }`. The comment is trimmed; an empty one is saved as `null`.
+- Rules: the user must have a `delivered` order for this product (`business-rules.md`), checked on every create and every update.
 - Response `200`: `{ data: { review, ratingAvg, reviewCount } }`
 - Errors: `400`, `401`, `403 NOT_PURCHASED`, `404`
-- Schema: `saveReviewSchema`
+- Schema: `getProductSchema` (params), `saveReviewSchema` (body)
 
 ### `DELETE /api/products/:slug/reviews/mine`
-- Auth: required. Response `200`: `{ data: { ratingAvg, reviewCount } }`
+- Auth: required. Needs no purchase. Response `200`: `{ data: { ratingAvg, reviewCount } }`, also when the user has no review (nothing changes).
+- Errors: `401`, `404` (unknown or inactive product)
+- Schema: `getProductSchema` (params)
 
 ## Cart
 

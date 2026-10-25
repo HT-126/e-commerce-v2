@@ -106,7 +106,7 @@ Merge when the user signs in or registers:
 - A `delivered` order cannot be cancelled, so a review never loses the order behind it.
 - Required test: a user with no order, and a user with only a `paid` or `shipped` order, both get `403 NOT_PURCHASED`; a user with a `delivered` order can review.
 - The product page shows "Write a review" only when the user can review. Otherwise it shows "Only customers who bought this item can review it."
-- One review per user per product. The user can edit or delete their own review.
+- One review per user per product. The user can edit or delete their own review. Deleting needs no purchase check: a user can always remove their own review.
 - A review is a rating 1 to 5, with an optional comment (max 1000 characters). Rating only is allowed.
 - The product page lists reviews that have a comment, newest first. Rating-only reviews count in the average only.
 - Shown rating mixes the dataset value and real reviews:
