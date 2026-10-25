@@ -301,15 +301,52 @@ describe('the session: GET /api/auth/me and POST /api/auth/logout', () => {
     expect(keysOf(res.body).join(' ')).not.toMatch(/password|hash/i);
   });
 
+  // The tokens belong to a user that exists, so a 401 can only be about the token. (Test users never get
+  // id 1: the auto-increment does not reset when the tables are cleaned.)
+  const base64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const goodToken = (id) =>
+    jwt.sign({ sub: String(id) }, env.JWT_SECRET, { algorithm: 'HS256', expiresIn: 60 });
+
+  it('me: the control case: a correctly signed token of an existing user is accepted', async () => {
+    const user = await createUser();
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', `token=${goodToken(user.id)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.id).toBe(user.id);
+  });
+
   it.each([
     ['garbage', () => 'not-a-token'],
-    ['a token with a changed signature', () => jwt.sign({ sub: '1' }, env.JWT_SECRET).slice(0, -3) + 'abc'],
-    ['a token signed with another secret', () => jwt.sign({ sub: '1' }, 'another-secret')],
-    ['an expired token', () => jwt.sign({ sub: '1' }, env.JWT_SECRET, { expiresIn: -10 })],
+    ['a token with a changed signature', (id) => goodToken(id).slice(0, -3) + 'abc'],
+    [
+      'a token with a changed user id (the signature no longer fits)',
+      (id) => {
+        const [header, , signature] = goodToken(id).split('.');
+        return `${header}.${base64url({ sub: String(id + 1), exp: 4102444800 })}.${signature}`;
+      },
+    ],
+    [
+      'a token signed with another secret',
+      (id) => jwt.sign({ sub: String(id) }, 'another-secret', { expiresIn: 60 }),
+    ],
+    ['an expired token', (id) => jwt.sign({ sub: String(id) }, env.JWT_SECRET, { expiresIn: -10 })],
+    [
+      'a token signed with another algorithm (HS512)',
+      (id) => jwt.sign({ sub: String(id) }, env.JWT_SECRET, { algorithm: 'HS512', expiresIn: 60 }),
+    ],
+    [
+      'a token with no signature (alg none)',
+      (id) => `${base64url({ alg: 'none', typ: 'JWT' })}.${base64url({ sub: String(id), exp: 4102444800 })}.`,
+    ],
   ])('me: gives 401 for %s', async (_name, makeToken) => {
-    await createUser();
+    const user = await createUser();
 
-    const res = await request(app).get('/api/auth/me').set('Cookie', `token=${makeToken()}`);
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', `token=${makeToken(user.id)}`);
 
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('UNAUTHORIZED');
@@ -481,6 +518,32 @@ describe('rate limits', () => {
       .send(validRegistration());
 
     expect(res.status).toBe(429);
+  });
+
+  it('a rejected request (400) also counts as a failed sign in', async () => {
+    const target = behindProxy();
+    for (let i = 1; i <= 10; i++) {
+      const bad = await request(target)
+        .post('/api/auth/login')
+        .set(from('203.0.113.5'))
+        .send({ email: `x${i}@example.com` });
+      expect(bad.status).toBe(400);
+    }
+
+    const res = await failedLogin(target, '203.0.113.5', 'next@example.com');
+
+    expect(res.status).toBe(429);
+  });
+
+  it('a very long email cannot be used to fill the memory of the counters (the key is cut)', async () => {
+    const target = behindProxy();
+
+    const res = await request(target)
+      .post('/api/auth/login')
+      .set(from('203.0.113.5'))
+      .send({ email: `${'a'.repeat(5000)}@example.com`, password: 'x' });
+
+    expect(res.status).toBe(400);
   });
 
   it('without a proxy, X-Forwarded-For is ignored (nobody can fake their IP to get around the limit)', async () => {

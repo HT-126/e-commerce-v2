@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { describe, expect, it } from 'vitest';
 import { env } from '../../src/config/env.js';
-import { sessionSeconds, signToken, verifyToken } from '../../src/utils/session.js';
+import { cookieOptions, sessionSeconds, signToken, verifyToken } from '../../src/utils/session.js';
 
 const base64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
@@ -50,5 +50,21 @@ describe('signToken and verifyToken', () => {
     ['a token signed with another algorithm', jwt.sign({ sub: '1' }, env.JWT_SECRET, { algorithm: 'HS512' })],
   ])('rejects %s', (_name, token) => {
     expect(verifyToken(token)).toBeNull();
+  });
+});
+
+describe('cookieOptions', () => {
+  it('is HttpOnly, SameSite=Lax and for the whole site', () => {
+    expect(cookieOptions(false)).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/' });
+    expect(cookieOptions(true)).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/' });
+  });
+
+  it('is Secure (HTTPS only) in production, and not outside it', () => {
+    expect(cookieOptions(true).secure).toBe(true);
+    expect(cookieOptions(false).secure).toBe(false);
+  });
+
+  it('follows NODE_ENV when no flag is given (tests run outside production)', () => {
+    expect(cookieOptions().secure).toBe(false);
   });
 });

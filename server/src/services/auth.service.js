@@ -46,6 +46,7 @@ export async function loginUser({ email, password }) {
 }
 
 export async function getUser(id) {
-  const row = await db('users').where({ id }).first();
+  // Only the public columns: requireAuth runs this on every request, and the hash is not needed there.
+  const row = await db('users').where({ id }).first('id', 'first_name', 'last_name', 'email', 'role');
   return row ? toUser(row) : null;
 }

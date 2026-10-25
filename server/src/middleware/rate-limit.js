@@ -13,9 +13,11 @@ const base = { standardHeaders: 'draft-7', legacyHeaders: false, handler };
 
 // Runs before Zod, so the email is trimmed and lower-cased here. Without an email, fall back to the IP.
 export const emailKey = (req) => {
+  // Cut at the longest valid email, so a huge value cannot fill the memory of the counters.
   const email = String(req.body?.email ?? '')
     .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .slice(0, 255);
   return email || ipKeyGenerator(req.ip);
 };
 
