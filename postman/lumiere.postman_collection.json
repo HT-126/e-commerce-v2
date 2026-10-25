@@ -2718,6 +2718,923 @@
           }
         }
       ]
+    },
+    {
+      "name": "Reviews",
+      "description": "Run from top to bottom. It signs in as the demo customer, writes, changes and deletes one review of a product from their delivered order, and ends signed out with the shown rating back where it started. It needs the demoEmail and demoPassword collection variables.",
+      "item": [
+        {
+          "name": "Login: the demo customer (has a delivered order)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const missing = [\"demoEmail\",\"demoPassword\"].filter((name) => !pm.variables.get(name));",
+                  "if (missing.length) throw new Error(\"Not sent. Set the current value of the collection variable(s): \" + missing.join(\", \") + \". Importing the collection again clears them. See postman/README.md.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"role is customer\", () => pm.expect(pm.response.json().data.user.role).to.eql(\"customer\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{demoEmail}}\",\n  \"password\": \"{{demoPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "The seed gives the demo customer one `delivered` order with 2 products, so they may review those. Uses the demoEmail and demoPassword collection variables (current values, from server/.env)."
+          }
+        },
+        {
+          "name": "Setup: find the delivered order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const delivered = pm.response.json().data.items.find((o) => o.status === 'delivered');",
+                  "pm.test(\"the demo customer has a delivered order (the seed makes one)\", () => pm.expect(delivered).to.be.an(\"object\"));",
+                  "pm.collectionVariables.set(\"reviewOrderNumber\", delivered.orderNumber);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Finds the demo customer's `delivered` order and saves its number in `reviewOrderNumber`."
+          }
+        },
+        {
+          "name": "Setup: the products of that order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const slugs = pm.response.json().data.items.map((i) => i.productSlug);",
+                  "pm.test(\"the order has products\", () => pm.expect(slugs.length).to.be.at.least(1));",
+                  "pm.collectionVariables.set(\"reviewSlug\", slugs[0]);",
+                  "pm.collectionVariables.set(\"reviewBoughtSlugs\", JSON.stringify(slugs));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{reviewOrderNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{reviewOrderNumber}}"
+              ]
+            },
+            "description": "Saves the slug of its first product in `reviewSlug`, and the slugs of all its products in `reviewBoughtSlugs`."
+          }
+        },
+        {
+          "name": "Setup: a product the customer did not buy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const bought = JSON.parse(pm.collectionVariables.get(\"reviewBoughtSlugs\"));",
+                  "const other = pm.response.json().data.items.find((p) => !bought.includes(p.slug));",
+                  "pm.test(\"a product that was not bought\", () => pm.expect(other).to.be.an(\"object\"));",
+                  "pm.collectionVariables.set(\"reviewOtherSlug\", other.slug);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?limit=24",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ]
+            },
+            "description": "Saves the slug of the first product that is not in the delivered order in `reviewOtherSlug`."
+          }
+        },
+        {
+          "name": "Clean start: delete any earlier review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "A review left by an earlier run would change the numbers below, so it goes first. Deleting needs no purchase and answers 200 even when there is no review."
+          }
+        },
+        {
+          "name": "The product before reviewing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const product = pm.response.json().data;",
+                  "pm.collectionVariables.set(\"reviewCountBefore\", String(product.reviewCount));",
+                  "pm.collectionVariables.set(\"reviewAvgBefore\", String(product.ratingAvg));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}"
+              ]
+            },
+            "description": "Saves the shown rating and review count to compare with later."
+          }
+        },
+        {
+          "name": "My review: none yet, and I may write one",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"no review yet, and canReview is true\", () => { pm.expect(data.review).to.eql(null); pm.expect(data.canReview).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "`canReview` is true because the customer has a delivered order for this product."
+          }
+        },
+        {
+          "name": "Write a review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"the review we sent\", () => { pm.expect(data.review.rating).to.eql(5); pm.expect(data.review.comment).to.eql(\"Postman review\"); });",
+                  "const before = Number(pm.collectionVariables.get(\"reviewCountBefore\"));",
+                  "const avgBefore = Number(pm.collectionVariables.get(\"reviewAvgBefore\"));",
+                  "pm.test(\"the count goes up by one\", () => pm.expect(data.reviewCount).to.eql(before + 1));",
+                  "pm.test(\"the rating is the average with the new review (to one decimal)\", () => { const expected = (avgBefore * before + 5) / (before + 1); pm.expect(Math.abs(data.ratingAvg - expected)).to.be.at.most(0.1); pm.expect(Math.round(data.ratingAvg * 10) / 10).to.eql(data.ratingAvg); });",
+                  "pm.collectionVariables.set(\"reviewAvgAfter\", String(data.ratingAvg));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "5 stars with a comment. The shown rating and count change in the same transaction: the count goes up by one and the rating is the average of the dataset reviews and this one.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Postman review\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "The product page shows the new rating",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const product = pm.response.json().data;",
+                  "pm.test(\"count and rating match the review answer\", () => { pm.expect(product.reviewCount).to.eql(Number(pm.collectionVariables.get(\"reviewCountBefore\")) + 1); pm.expect(String(product.ratingAvg)).to.eql(pm.collectionVariables.get(\"reviewAvgAfter\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}"
+              ]
+            },
+            "description": "The same numbers the review answered with."
+          }
+        },
+        {
+          "name": "The reviews list (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"my review is in the list\", () => pm.expect(data.items.some((r) => r.comment === \"Postman review\" && r.rating === 5)).to.eql(true));",
+                  "pm.test(\"authors are like \\\"Anna K.\\\", with no email or user id\", () => { data.items.forEach((r) => pm.expect(r.authorName).to.match(/^\\S+ \\S\\.$/)); pm.expect(pm.response.text()).to.not.match(/@|userId|user_id|password/i); });",
+                  "pm.test(\"newest first\", () => { const times = data.items.map((r) => Date.parse(r.createdAt)); pm.expect(times).to.eql([...times].sort((a, b) => b - a)); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews"
+              ]
+            },
+            "description": "Newest first, only reviews with a comment. Each shows the author as first name and last initial, never an email."
+          }
+        },
+        {
+          "name": "My review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"my review\", () => { pm.expect(data.review.rating).to.eql(5); pm.expect(data.review.comment).to.eql(\"Postman review\"); pm.expect(data.canReview).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "The signed-in customer's own review."
+          }
+        },
+        {
+          "name": "Change the review to a rating only",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"2 stars, no comment\", () => { pm.expect(data.review.rating).to.eql(2); pm.expect(data.review.comment).to.eql(null); });",
+                  "pm.test(\"still one new review in the count, and the rating went down\", () => { pm.expect(data.reviewCount).to.eql(Number(pm.collectionVariables.get(\"reviewCountBefore\")) + 1); pm.expect(data.ratingAvg).to.be.below(Number(pm.collectionVariables.get(\"reviewAvgAfter\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "A second save changes the same review (one per customer per product). Without a comment it is a rating only: it counts in the average, but it is not in the list.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A rating-only review is not in the list",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"no Postman review in the list\", () => pm.expect(pm.response.json().data.items.some((r) => r.comment === \"Postman review\")).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews"
+              ]
+            },
+            "description": "The comment is gone, so the review is not listed any more."
+          }
+        },
+        {
+          "name": "Error: rating 6",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"error code VALIDATION_ERROR\", () => pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "A rating is a whole number from 1 to 5.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: a comment of 1001 characters",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"longComment\", \"a\".repeat(1001));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"error code VALIDATION_ERROR\", () => pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "A comment is at most 1000 characters. The text is made by the pre-request script.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"{{longComment}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: review a product that was not bought",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"error code NOT_PURCHASED\", () => pm.expect(pm.response.json().error.code).to.eql(\"NOT_PURCHASED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewOtherSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewOtherSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "No delivered order for this product, so no review: `403 NOT_PURCHASED`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Never bought it\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "My review of a product not bought: cannot review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"no review, and canReview is false\", () => { const data = pm.response.json().data; pm.expect(data.review).to.eql(null); pm.expect(data.canReview).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewOtherSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewOtherSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "The page uses this to show the review form only to buyers."
+          }
+        },
+        {
+          "name": "Delete my review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"count and rating are back to the start\", () => { pm.expect(data.reviewCount).to.eql(Number(pm.collectionVariables.get(\"reviewCountBefore\"))); pm.expect(String(data.ratingAvg)).to.eql(pm.collectionVariables.get(\"reviewAvgBefore\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "The shown rating and count go back to what they were before the review."
+          }
+        },
+        {
+          "name": "Delete again: nothing changes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"same numbers\", () => { const data = pm.response.json().data; pm.expect(data.reviewCount).to.eql(Number(pm.collectionVariables.get(\"reviewCountBefore\"))); pm.expect(String(data.ratingAvg)).to.eql(pm.collectionVariables.get(\"reviewAvgBefore\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "Deleting a review that is not there is fine and gives the same numbers."
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Ends the demo customer's session."
+          }
+        },
+        {
+          "name": "Error: write a review when signed out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"error code UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "Writing needs a session.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: my review when signed out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"error code UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "Needs a session."
+          }
+        },
+        {
+          "name": "The reviews list needs no sign in",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{reviewSlug}}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{reviewSlug}}",
+                "reviews"
+              ]
+            },
+            "description": "Anyone can read the reviews."
+          }
+        },
+        {
+          "name": "Error: reviews of an unknown product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"error code NOT_FOUND\", () => pm.expect(pm.response.json().error.code).to.eql(\"NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/no-such-product/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "no-such-product",
+                "reviews"
+              ]
+            },
+            "description": "A product that does not exist (or is hidden) is a 404."
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -2818,6 +3735,46 @@
     },
     {
       "key": "orderTotal",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewOrderNumber",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewSlug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewBoughtSlugs",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewOtherSlug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewCountBefore",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewAvgBefore",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewAvgAfter",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "longComment",
       "value": "",
       "type": "string"
     }
