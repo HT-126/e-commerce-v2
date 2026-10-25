@@ -250,6 +250,10 @@ describe('GET /api/products: filter input limits', () => {
     expect((await get(`size=${'a'.repeat(21)}`)).status).toBe(400);
   });
 
+  it('gives 400 for a parameter repeated in the URL (the lists are comma separated)', async () => {
+    expect((await get('color=black&color=white')).status).toBe(400);
+  });
+
   it('is safe against SQL in the values', async () => {
     await createProduct({ slug: 'one' });
 

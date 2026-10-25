@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useSearchParams } from 'react-router';
 import { useCategories } from '../hooks/use-catalog.js';
 import { useScrolled } from '../hooks/use-scrolled.js';
@@ -12,7 +12,9 @@ const categoryLink = ({ isActive }) =>
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const headerRef = useRef(null);
   const searchButtonRef = useRef(null);
+  const menuButtonRef = useRef(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scrolled = useScrolled();
@@ -21,6 +23,33 @@ export default function Header() {
     setMenuOpen(false);
     setSearchOpen(false);
   };
+
+  // An open panel closes on Escape (focus goes back to its button), a click outside, or Tab leaving the header.
+  const panelOpen = menuOpen || searchOpen;
+  useEffect(() => {
+    if (!panelOpen) return undefined;
+
+    const closeAll = () => {
+      setMenuOpen(false);
+      setSearchOpen(false);
+    };
+    const closeIfOutside = (event) => {
+      if (!headerRef.current?.contains(event.target)) closeAll();
+    };
+    const closeOnEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      (searchOpen ? searchButtonRef : menuButtonRef).current?.focus();
+      closeAll();
+    };
+    document.addEventListener('pointerdown', closeIfOutside);
+    document.addEventListener('focusin', closeIfOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeIfOutside);
+      document.removeEventListener('focusin', closeIfOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [panelOpen, searchOpen]);
 
   function toggleMenu() {
     setSearchOpen(false);
@@ -40,12 +69,6 @@ export default function Header() {
     navigate(text ? `/shop?${new URLSearchParams({ q: text })}` : '/shop');
   }
 
-  function closeSearchOnEscape(event) {
-    if (event.key !== 'Escape') return;
-    setSearchOpen(false);
-    searchButtonRef.current?.focus();
-  }
-
   const links = [
     // A plain link: NavLink ignores the query string, so it would look active on every shop page.
     <Link key="new" to="/shop?sort=newest" className={baseLink} onClick={close}>
@@ -61,7 +84,10 @@ export default function Header() {
   return (
     // Sticky: 64px (h-16), white, above the page content (z-40, filter panels are z-30).
     // The shadow only shows once the page has scrolled.
-    <header className={`sticky top-0 z-40 h-16 bg-white transition-shadow ${scrolled ? 'shadow-md' : ''}`}>
+    <header
+      ref={headerRef}
+      className={`sticky top-0 z-40 h-16 bg-white transition-shadow ${scrolled ? 'shadow-md' : ''}`}
+    >
       <div className="mx-auto flex h-full w-full max-w-7xl items-center justify-between gap-4 px-6">
         <Link to="/" className="font-serif text-2xl" onClick={close}>
           Lumière
@@ -77,17 +103,18 @@ export default function Header() {
             type="button"
             aria-label="Search"
             aria-expanded={searchOpen}
-            aria-controls="header-search"
+            aria-controls={searchOpen ? 'header-search' : undefined}
             onClick={toggleSearch}
             className="flex size-11 items-center justify-center rounded-full hover:bg-panel"
           >
             <SearchIcon />
           </button>
           <button
+            ref={menuButtonRef}
             type="button"
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
-            aria-controls="mobile-menu"
+            aria-controls={menuOpen ? 'mobile-menu' : undefined}
             onClick={toggleMenu}
             className="flex size-11 items-center justify-center rounded-full hover:bg-panel xl:hidden"
           >
@@ -102,7 +129,6 @@ export default function Header() {
             id="header-search"
             role="search"
             onSubmit={submitSearch}
-            onKeyDown={closeSearchOnEscape}
             className="mx-auto flex max-w-7xl items-center gap-2 px-6 py-2"
           >
             <SearchIcon className="size-5 shrink-0 text-ink-soft" />

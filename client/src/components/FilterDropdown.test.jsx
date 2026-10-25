@@ -51,6 +51,24 @@ describe('FilterDropdown', () => {
     expect(button).toHaveFocus();
   });
 
+  it('closes when Tab moves focus outside, but not when focus stays inside', () => {
+    render(
+      <div>
+        <button>Next to it</button>
+        <FilterDropdown label="Color">
+          <input aria-label="Inside" />
+        </FilterDropdown>
+      </div>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Color' }));
+
+    fireEvent.focusIn(screen.getByLabelText('Inside'));
+    expect(screen.getByLabelText('Inside')).toBeInTheDocument();
+
+    fireEvent.focusIn(screen.getByRole('button', { name: 'Next to it' }));
+    expect(screen.queryByLabelText('Inside')).not.toBeInTheDocument();
+  });
+
   it('closes on a click outside, but not on a click inside', () => {
     renderDropdown();
     fireEvent.click(screen.getByRole('button', { name: 'Color' }));

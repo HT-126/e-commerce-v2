@@ -41,6 +41,28 @@ describe('Header', () => {
     expect(screen.getByRole('link', { name: 'New in' })).toHaveAttribute('href', '/shop?sort=newest');
   });
 
+  it('closes the menu on Escape and gives the focus back to its button', async () => {
+    renderHeader();
+    await screen.findByRole('link', { name: 'Dresses' });
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    expect(screen.getAllByRole('navigation', { name: 'Main' })).toHaveLength(2);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.getAllByRole('navigation', { name: 'Main' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Open menu' })).toHaveFocus();
+  });
+
+  it('closes the menu on a click outside the header', async () => {
+    renderHeader();
+    await screen.findByRole('link', { name: 'Dresses' });
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    fireEvent.pointerDown(document.body);
+
+    expect(screen.getAllByRole('navigation', { name: 'Main' })).toHaveLength(1);
+  });
+
   it('opens and closes the menu on small screens', async () => {
     renderHeader();
     await screen.findByRole('link', { name: 'Dresses' });
@@ -128,6 +150,37 @@ describe('Header', () => {
       expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
       expect(button).toHaveFocus();
       expect(where()).toBe('/');
+    });
+
+    it('the Search button points at the field only while it is open', () => {
+      renderHeader();
+      const button = screen.getByRole('button', { name: 'Search' });
+      expect(button).not.toHaveAttribute('aria-controls');
+
+      fireEvent.click(button);
+
+      expect(button).toHaveAttribute('aria-controls', 'header-search');
+      expect(document.getElementById('header-search')).not.toBeNull();
+    });
+
+    it('closes on a click outside the header, but not on a click inside it', () => {
+      renderHeader();
+      fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+      fireEvent.pointerDown(screen.getByRole('searchbox'));
+      expect(screen.getByRole('searchbox')).toBeInTheDocument();
+
+      fireEvent.pointerDown(document.body);
+      expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    });
+
+    it('closes when Tab moves focus out of the header', () => {
+      renderHeader();
+      fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+      fireEvent.focusIn(document.body);
+
+      expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
     });
 
     it('opening the menu closes the search, and the other way round', async () => {

@@ -13,7 +13,7 @@ export default function ShopPage() {
   const categories = useCategories();
   const filters = useFilters();
 
-  const params = readShopParams(searchParams);
+  const params = readShopParams(searchParams, { sizes: filters.data?.sizes });
   const hasFilters = hasActiveFilters(params);
   const products = useProducts(toApiParams(category, params), { keepPrevious: true });
 

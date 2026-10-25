@@ -41,7 +41,15 @@ function readPage(value) {
   return Number.isInteger(page) && page >= 1 && page <= MAX_PAGE ? page : 1;
 }
 
-export function readShopParams(searchParams) {
+// `?size=m` finds the M products (the database ignores case), so the M box must be ticked too:
+// once the options are known, a size in the URL takes the exact spelling of its option.
+function matchSizeOptions(sizes, options) {
+  if (!options) return sizes;
+  const byLowerCase = new Map(options.map((option) => [option.toLowerCase(), option]));
+  return [...new Set(sizes.map((size) => byLowerCase.get(size.toLowerCase()) ?? size))];
+}
+
+export function readShopParams(searchParams, { sizes: sizeOptions } = {}) {
   const sort = searchParams.get('sort');
   const min = searchParams.get('minPriceCents') ?? '';
   const max = searchParams.get('maxPriceCents') ?? '';
@@ -53,7 +61,7 @@ export function readShopParams(searchParams) {
       PRICE_RANGES.find((r) => (r.minPriceCents ?? '') === min && (r.maxPriceCents ?? '') === max) ??
       PRICE_RANGES[0],
     color: readList(searchParams.get('color'), { lower: true, max: MAX_COLORS }),
-    size: readList(searchParams.get('size'), { max: MAX_SIZES }),
+    size: matchSizeOptions(readList(searchParams.get('size'), { max: MAX_SIZES }), sizeOptions),
     q: (searchParams.get('q') ?? '').trim().slice(0, MAX_QUERY_LENGTH),
     page: readPage(searchParams.get('page')),
   };

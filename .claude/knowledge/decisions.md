@@ -21,7 +21,7 @@ Format: `- <decision> (reason: <why>)`. Newest at the bottom. Details live in th
 - `@hookform/resolvers` pinned to `^5` (reason: v6 has a peer dependency conflict with `npm install`).
 - Client linter is oxlint, the Vite template default (reason: no extra dependency; ESLint would be a new one).
 - Flat shipping $6.95 under $97.00, cookie 30 days / 1 day, rate limits as in `business-rules.md` confirmed as final (reason: owner reviewed the defaults).
-- Shop filters: Color uses about 12 base groups stored in `variants.color_group`, computed by one function from the dataset color name (reason: 502 raw names are too many to filter on; one column keeps the SQL simple and the index useful).
+- Shop filters: Color uses 14 groups (13 base colors and `other`) stored in `variants.color_group`, computed by one function from the dataset color name (reason: 502 raw names are too many to filter on; one column keeps the SQL simple and the index useful).
 - Color and Size filters match in-stock variants only (reason: a shopper who picks size M wants something buyable).
 - Search lives in the header; the Shop page has Color, Size, Price and Sort instead of a search box (reason: owner's choice). "Clear filters" also clears the search text.
 - Header is a full-width sticky white bar, 64px, with a shadow after scrolling (reason: owner's choice; replaces the rounded pill from the design).

@@ -3,6 +3,8 @@ import { colorGroupFor } from '../../src/utils/color-groups.js';
 const INDEX = 'variants_product_color_group_size_idx';
 
 // Base color for the shop filter. Existing rows are filled from `color_name`, so no reset is needed.
+// The backfill uses the app's mapping function, so it reads the rules as they are when the migration runs.
+// MySQL cannot roll back the ALTER: if the backfill fails, run `migrate:rollback` before running it again.
 export async function up(knex) {
   await knex.schema.alterTable('variants', (table) => {
     table.string('color_group', 20).notNullable().defaultTo('other');

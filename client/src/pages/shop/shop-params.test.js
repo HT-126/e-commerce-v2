@@ -22,6 +22,22 @@ describe('readShopParams', () => {
     expect(read('size=2XL,One%20Size').size).toEqual(['2XL', 'One Size']);
   });
 
+  it('gives a size the spelling of its option once the options are known', () => {
+    const options = { sizes: ['M', 'XL', 'One Size'] };
+
+    expect(readShopParams(new URLSearchParams('size=m,xl,one%20size'), options).size).toEqual([
+      'M',
+      'XL',
+      'One Size',
+    ]);
+    expect(readShopParams(new URLSearchParams('size=m,M'), options).size).toEqual(['M']);
+    expect(readShopParams(new URLSearchParams('size=99XL,m'), options).size).toEqual(['99XL', 'M']);
+  });
+
+  it('keeps sizes as typed while the options are not loaded yet', () => {
+    expect(readShopParams(new URLSearchParams('size=m')).size).toEqual(['m']);
+  });
+
   it('drops list items the API would reject (longer than 20 characters)', () => {
     expect(read(`size=${'a'.repeat(21)},M`).size).toEqual(['M']);
   });

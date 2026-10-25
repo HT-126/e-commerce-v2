@@ -102,6 +102,15 @@ describe('ShopPage', () => {
       expect(screen.getByRole('button', { name: 'Size (2)' })).toBeInTheDocument();
     });
 
+    it('a size typed in lower case in the URL ticks the matching box', async () => {
+      const fetchMock = renderShop('/shop?size=m');
+
+      expect(await screen.findByRole('button', { name: 'Size (1)' })).toBeInTheDocument();
+      await vi.waitFor(() => expect(lastProductUrl(fetchMock)).toContain('size=M&'));
+      fireEvent.click(screen.getByRole('button', { name: 'Size (1)' }));
+      expect(await screen.findByRole('checkbox', { name: 'M' })).toBeChecked();
+    });
+
     it('lists the color groups from the API', async () => {
       renderShop('/shop');
 

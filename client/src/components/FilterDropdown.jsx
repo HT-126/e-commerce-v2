@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDownIcon } from './icons.jsx';
 
-// A button that opens a panel of choices. Closes on Escape (focus goes back to the button) or a click outside.
+// A button that opens a panel of choices. Closes on Escape (focus goes back to the button), a click outside,
+// or when Tab moves focus out of it.
 export default function FilterDropdown({ label, count = 0, children, panelClassName = 'w-64' }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
@@ -10,7 +11,7 @@ export default function FilterDropdown({ label, count = 0, children, panelClassN
   useEffect(() => {
     if (!open) return undefined;
 
-    const closeOnOutsideClick = (event) => {
+    const closeIfOutside = (event) => {
       if (!wrapperRef.current?.contains(event.target)) setOpen(false);
     };
     const closeOnEscape = (event) => {
@@ -18,10 +19,12 @@ export default function FilterDropdown({ label, count = 0, children, panelClassN
       setOpen(false);
       buttonRef.current?.focus();
     };
-    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('pointerdown', closeIfOutside);
+    document.addEventListener('focusin', closeIfOutside);
     document.addEventListener('keydown', closeOnEscape);
     return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('pointerdown', closeIfOutside);
+      document.removeEventListener('focusin', closeIfOutside);
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [open]);
