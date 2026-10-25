@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
+import { ApiError } from '../lib/api.js';
 import { CART_KEY, MAX_LINES, MAX_QUANTITY, addQuantity, countUnits } from '../lib/cart.js';
 import { getCart, mergeCart, quoteCart, removeCartItem, setCartItem } from '../services/cart.js';
 import { useCartStore } from '../stores/cart-store.js';
@@ -141,6 +142,11 @@ export function useMergeGuestCart() {
     onSuccess: () => {
       useCartStore.getState().clear();
       return queryClient.invalidateQueries({ queryKey: CART_KEY });
+    },
+    // A 400 means the server will never accept this bag (too many lines or a bad value), so keeping it
+    // would only repeat the same failure on every page load. Any other failure may pass, so the bag stays.
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 400) useCartStore.getState().clear();
     },
   });
 

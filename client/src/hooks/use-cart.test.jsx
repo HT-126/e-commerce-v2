@@ -98,6 +98,17 @@ describe('useMergeGuestCart', () => {
     expect(mergeRequests(fetchMock)).toHaveLength(1);
   });
 
+  it('empties the browser bag when the server refuses it with a 400, because trying again cannot help', async () => {
+    useCartStore.setState({ items: guestItems });
+    const refused = { status: 400, body: { error: { message: 'Invalid input', code: 'VALIDATION_ERROR' } } };
+    const { fetchMock, wrapper } = setup({ user: aUser(), merge: refused });
+
+    renderHook(() => useMergeGuestCart(), { wrapper });
+
+    await waitFor(() => expect(useCartStore.getState().items).toEqual([]));
+    expect(mergeRequests(fetchMock)).toHaveLength(1);
+  });
+
   it('tries again on the next page load, which is a new mount', async () => {
     useCartStore.setState({ items: guestItems });
     const first = setup({ user: aUser(), merge: failure });

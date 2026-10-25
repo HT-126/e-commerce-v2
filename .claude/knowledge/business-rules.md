@@ -71,7 +71,7 @@ Merge when the user signs in or registers:
 4. Variant that no longer exists: skip it.
 5. Sold-out variants are kept. They show as `sold_out` in the cart.
 6. Sending the same items again changes nothing (because of rule 2), so a retry cannot double the quantities.
-7. After a successful merge, empty the browser cart. If the request fails, keep the browser cart and try again on the next page load.
+7. After a successful merge, empty the browser cart. If the request fails, keep the browser cart and try again on the next page load. Exception: if the server answers `400`, it will never accept this cart (more than 50 lines or a bad value), so empty the browser cart.
 8. On sign out, clear the browser cart. The account cart stays on the server.
 
 ## Accounts
