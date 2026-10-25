@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { createAuthRoutes } from './routes/auth.routes.js';
+import cartRoutes from './routes/cart.routes.js';
 import categoriesRoutes from './routes/categories.routes.js';
 import filtersRoutes from './routes/filters.routes.js';
 import healthRoutes from './routes/health.routes.js';
@@ -24,6 +25,7 @@ export function createApp({ trustProxy = env.TRUST_PROXY } = {}) {
 
   app.use('/api/health', healthRoutes);
   app.use('/api/auth', createAuthRoutes(createRateLimiters()));
+  app.use('/api/cart', cartRoutes);
   app.use('/api/categories', categoriesRoutes);
   app.use('/api/filters', filtersRoutes);
   app.use('/api/products', productsRoutes);
