@@ -40,6 +40,32 @@ describe('FilterDropdown', () => {
     expect(screen.getByRole('button', { name: 'Color' })).toBeInTheDocument();
   });
 
+  it('names the control for screen readers when the button shows the current choice', () => {
+    render(
+      <FilterDropdown label="Newest" name="Sort by">
+        <p>Choices</p>
+      </FilterDropdown>,
+    );
+    const button = screen.getByRole('button', { name: 'Sort by: Newest' });
+
+    expect(button).toHaveTextContent('Newest');
+    fireEvent.click(button);
+    expect(screen.getByRole('group', { name: 'Sort by' })).toBeInTheDocument();
+  });
+
+  it('gives a function child a close that shuts the panel and returns the focus', () => {
+    render(
+      <FilterDropdown label="Price">{({ close }) => <button onClick={close}>Pick</button>}</FilterDropdown>,
+    );
+    const button = screen.getByRole('button', { name: 'Price' });
+    fireEvent.click(button);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pick' }));
+
+    expect(screen.queryByRole('button', { name: 'Pick' })).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+  });
+
   it('closes on Escape and puts the focus back on the button', () => {
     renderDropdown();
     const button = screen.getByRole('button', { name: 'Color' });

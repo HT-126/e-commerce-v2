@@ -1,7 +1,7 @@
 import Button from '../../components/Button.jsx';
 import CheckboxList from '../../components/CheckboxList.jsx';
+import ChoiceList from '../../components/ChoiceList.jsx';
 import FilterDropdown from '../../components/FilterDropdown.jsx';
-import PlainSelect from '../../components/PlainSelect.jsx';
 import { PRICE_RANGES, SORTS } from './shop-params.js';
 
 // Keeps ticked values in the order of the options, so the same choice always gives the same URL.
@@ -31,7 +31,7 @@ export default function ShopFilters({ filters, params, hasFilters, onChange, onC
   const sizeOptions = (filters.data?.sizes ?? []).map((size) => ({ value: size, label: size }));
 
   return (
-    <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-1">
+    <div className="relative mt-6 flex flex-wrap items-center gap-x-6 gap-y-1">
       <FilterDropdown label="Color" count={params.color.length}>
         <OptionPanel
           filters={filters}
@@ -41,7 +41,7 @@ export default function ShopFilters({ filters, params, hasFilters, onChange, onC
         />
       </FilterDropdown>
 
-      <FilterDropdown label="Size" count={params.size.length} panelClassName="w-72">
+      <FilterDropdown label="Size" count={params.size.length} width="md:w-72">
         <OptionPanel
           filters={filters}
           options={sizeOptions}
@@ -51,20 +51,24 @@ export default function ShopFilters({ filters, params, hasFilters, onChange, onC
         />
       </FilterDropdown>
 
-      <PlainSelect
-        label="Price"
-        value={params.price.key}
-        onChange={(event) => {
-          const range = PRICE_RANGES.find((r) => r.key === event.target.value);
-          onChange({ minPriceCents: range.minPriceCents ?? '', maxPriceCents: range.maxPriceCents ?? '' });
-        }}
-      >
-        {PRICE_RANGES.map((range) => (
-          <option key={range.key} value={range.key}>
-            {range.label}
-          </option>
-        ))}
-      </PlainSelect>
+      {/* Price and Sort open the same kind of white panel as Color. One pick finishes the job, so they close. */}
+      <FilterDropdown label={params.price.label} name="Price" width="md:w-56">
+        {({ close }) => (
+          <ChoiceList
+            name="price"
+            options={PRICE_RANGES.map((range) => ({ value: range.key, label: range.label }))}
+            value={params.price.key}
+            onChange={(key) => {
+              const range = PRICE_RANGES.find((r) => r.key === key);
+              onChange({
+                minPriceCents: range.minPriceCents ?? '',
+                maxPriceCents: range.maxPriceCents ?? '',
+              });
+              close();
+            }}
+          />
+        )}
+      </FilterDropdown>
 
       {hasFilters && (
         <Button variant="outline" onClick={onClear}>
@@ -72,18 +76,27 @@ export default function ShopFilters({ filters, params, hasFilters, onChange, onC
         </Button>
       )}
 
-      <PlainSelect
-        label="Sort by"
-        value={params.sort}
-        onChange={(event) => onChange({ sort: event.target.value })}
-        className="md:ml-auto"
-      >
-        {SORTS.map((sort) => (
-          <option key={sort.value} value={sort.value}>
-            {sort.label}
-          </option>
-        ))}
-      </PlainSelect>
+      <div className="md:ml-auto">
+        <FilterDropdown
+          label={SORTS.find((s) => s.value === params.sort).label}
+          name="Sort by"
+          width="md:w-56"
+          align="right"
+        >
+          {({ close }) => (
+            <ChoiceList
+              plain
+              name="sort"
+              options={SORTS}
+              value={params.sort}
+              onChange={(sort) => {
+                onChange({ sort });
+                close();
+              }}
+            />
+          )}
+        </FilterDropdown>
+      </div>
     </div>
   );
 }

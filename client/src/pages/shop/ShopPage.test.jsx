@@ -35,6 +35,14 @@ async function openAndTick(button, ...names) {
   for (const name of names) fireEvent.click(await screen.findByRole('checkbox', { name }));
 }
 
+// Price and Sort open a panel of choices, like Color. `buttonName` is the button's name, for example "Sort by: Newest".
+async function choose(buttonName, optionName) {
+  fireEvent.click(await screen.findByRole('button', { name: buttonName }));
+  fireEvent.click(await screen.findByRole('radio', { name: optionName }));
+}
+
+const sortButton = () => screen.findByRole('button', { name: /^Sort by:/ });
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe('ShopPage', () => {
@@ -146,25 +154,90 @@ describe('ShopPage', () => {
       ['$100+', '/api/products?sort=newest&minPriceCents=10000&page=1&limit=12'],
     ])('choosing %s asks the API for that range', async (label, expectedUrl) => {
       const fetchMock = renderShop('/shop');
-      await screen.findByLabelText('Price');
 
-      fireEvent.change(screen.getByLabelText('Price'), {
-        target: { value: screen.getByRole('option', { name: label }).value },
-      });
+      await choose('Price: Any price', label);
 
       await vi.waitFor(() => expect(calledUrls(fetchMock)).toContain(expectedUrl));
     });
 
     it('"Any price" removes the range again', async () => {
       const fetchMock = renderShop('/shop?minPriceCents=2500&maxPriceCents=4999');
-      await screen.findByLabelText('Price');
-      expect(screen.getByLabelText('Price')).toHaveDisplayValue('$25-$50');
 
-      fireEvent.change(screen.getByLabelText('Price'), { target: { value: 'any' } });
+      await choose('Price: $25-$50', 'Any price');
 
       await vi.waitFor(() =>
         expect(lastProductUrl(fetchMock)).toBe('/api/products?sort=newest&page=1&limit=12'),
       );
+    });
+
+    it('lists the price ranges as one-of-many choices, with the current one picked', async () => {
+      renderShop('/shop?minPriceCents=5000&maxPriceCents=7499');
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Price: $50-$75' }));
+
+      expect((await screen.findAllByRole('radio')).map((radio) => radio.parentElement.textContent)).toEqual([
+        'Any price',
+        'Under $25',
+        '$25-$50',
+        '$50-$75',
+        '$75-$100',
+        '$100+',
+      ]);
+      expect(screen.getByRole('radio', { name: '$50-$75' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Any price' })).not.toBeChecked();
+    });
+
+    it('closes the panel after a pick and puts the focus back on the button', async () => {
+      renderShop('/shop');
+
+      await choose('Price: Any price', 'Under $25');
+
+      expect(screen.queryByRole('group', { name: 'Price' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Price: Under $25' })).toHaveFocus();
+    });
+  });
+
+  describe('sort', () => {
+    it('opens a plain list of the four sorts, with no checkboxes and no radio circles', async () => {
+      renderShop('/shop?sort=rating');
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Sort by: Top rated' }));
+      const panel = await screen.findByRole('group', { name: 'Sort by' });
+
+      expect(within(panel).queryAllByRole('checkbox')).toHaveLength(0);
+      expect(
+        within(panel)
+          .getAllByRole('radio')
+          .map((radio) => radio.parentElement.textContent),
+      ).toEqual(['Newest', 'Top rated', 'Price: low to high', 'Price: high to low']);
+      // the real radio inputs are there for keyboards and screen readers, but not drawn
+      within(panel)
+        .getAllByRole('radio')
+        .forEach((radio) => expect(radio).toHaveClass('sr-only'));
+      expect(within(panel).getByRole('radio', { name: 'Top rated' })).toBeChecked();
+    });
+
+    it('picking a sort asks the API and closes the panel', async () => {
+      const fetchMock = renderShop('/shop?page=2', { total: 30 });
+
+      await choose('Sort by: Newest', 'Price: low to high');
+
+      await vi.waitFor(() =>
+        expect(lastProductUrl(fetchMock)).toBe('/api/products?sort=price_asc&page=1&limit=12'),
+      );
+      expect(screen.queryByRole('group', { name: 'Sort by' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Sort by: Price: low to high' })).toHaveFocus();
+    });
+
+    it('picking the sort that is already chosen just closes the panel', async () => {
+      const fetchMock = renderShop('/shop');
+      await screen.findByRole('link', { name: /Blue Dress/ });
+      const before = productUrls(fetchMock).length;
+
+      await choose('Sort by: Newest', 'Newest');
+
+      expect(screen.queryByRole('group', { name: 'Sort by' })).not.toBeInTheDocument();
+      expect(productUrls(fetchMock).length).toBe(before);
     });
   });
 
@@ -186,8 +259,8 @@ describe('ShopPage', () => {
 
       expect(await screen.findByRole('button', { name: 'Color (2)' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Size (1)' })).toBeInTheDocument();
-      expect(screen.getByLabelText('Price')).toHaveDisplayValue('$25-$50');
-      expect(screen.getByLabelText('Sort by')).toHaveDisplayValue('Price: high to low');
+      expect(screen.getByRole('button', { name: 'Price: $25-$50' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sort by: Price: high to low' })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Color (2)' }));
       expect(await screen.findByRole('checkbox', { name: 'Black' })).toBeChecked();
@@ -197,9 +270,8 @@ describe('ShopPage', () => {
 
     it('changes the sort and goes back to page 1', async () => {
       const fetchMock = renderShop('/shop?page=2', { total: 30 });
-      await screen.findByLabelText('Sort by');
 
-      fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'rating' } });
+      await choose('Sort by: Newest', 'Top rated');
 
       await vi.waitFor(() =>
         expect(calledUrls(fetchMock)).toContain('/api/products?sort=rating&page=1&limit=12'),
@@ -210,7 +282,7 @@ describe('ShopPage', () => {
   describe('Clear filters', () => {
     it('is not shown when no filter is active', async () => {
       renderShop('/shop?sort=rating&page=2', { total: 30 });
-      await screen.findByLabelText('Sort by');
+      await sortButton();
 
       expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
     });
@@ -228,7 +300,7 @@ describe('ShopPage', () => {
       );
       expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Color' })).toBeInTheDocument();
-      expect(screen.getByLabelText('Price')).toHaveDisplayValue('Any price');
+      expect(screen.getByRole('button', { name: 'Price: Any price' })).toBeInTheDocument();
     });
   });
 
@@ -259,23 +331,21 @@ describe('ShopPage', () => {
       expect(await screen.findByRole('link', { name: /Blue Dress/ })).toBeInTheDocument();
 
       expect(calledUrls(fetchMock)).toContain('/api/products?sort=newest&page=1&limit=12');
-      expect(screen.getByLabelText('Price')).toHaveDisplayValue('Any price');
-      expect(screen.getByLabelText('Sort by')).toHaveDisplayValue('Newest');
+      expect(screen.getByRole('button', { name: 'Price: Any price' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sort by: Newest' })).toBeInTheDocument();
     });
 
     it('a price that is not one of the choices is ignored', async () => {
       const fetchMock = renderShop('/shop?maxPriceCents=3000');
 
-      await screen.findByLabelText('Price');
-
-      expect(screen.getByLabelText('Price')).toHaveDisplayValue('Any price');
+      expect(await screen.findByRole('button', { name: 'Price: Any price' })).toBeInTheDocument();
       expect(productUrls(fetchMock).every((url) => !url.includes('maxPriceCents'))).toBe(true);
     });
 
     it('a list item that is too long is dropped', async () => {
       const fetchMock = renderShop(`/shop?size=${'a'.repeat(25)},M`);
 
-      await screen.findByLabelText('Sort by');
+      await sortButton();
 
       expect(calledUrls(fetchMock)).toContain('/api/products?sort=newest&size=M&page=1&limit=12');
     });
@@ -283,7 +353,7 @@ describe('ShopPage', () => {
     it('a search that is too long is cut', async () => {
       const fetchMock = renderShop(`/shop?q=${'a'.repeat(150)}`);
 
-      await screen.findByLabelText('Sort by');
+      await sortButton();
 
       expect(calledUrls(fetchMock)).toContain(
         `/api/products?sort=newest&q=${'a'.repeat(100)}&page=1&limit=12`,
@@ -348,7 +418,7 @@ describe('ShopPage', () => {
       renderRoute(<ShopPage />, { path: '/shop/:category?', url: '/shop' });
       await screen.findByRole('link', { name: /Blue Dress/ });
 
-      fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'rating' } });
+      await choose('Sort by: Newest', 'Top rated');
 
       expect(await screen.findByRole('status', { name: 'Loading products' })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /Blue Dress/ })).not.toBeInTheDocument();
