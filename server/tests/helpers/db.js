@@ -119,3 +119,47 @@ export async function login(app, user, { remember = false } = {}) {
   if (res.status !== 200) throw new Error(`login helper failed: ${res.status} ${res.text}`);
   return agent;
 }
+
+// An order in the database with one line for `product` (the result of `createProduct`), for a test that
+// reads orders. It does not touch the stock or the cart.
+export async function createOrder({
+  user,
+  product,
+  quantity = 1,
+  status = 'paid',
+  createdAt = new Date(),
+  orderNumber,
+} = {}) {
+  const n = next();
+  const row = await db('products').where({ id: product.id }).first();
+  const variant = await db('variants').where({ product_id: product.id }).orderBy('position').first();
+  const image = await db('product_images').where({ product_id: product.id, position: 0 }).first();
+  const subtotal = row.price_cents * quantity;
+  const shipping = subtotal >= 9700 ? 0 : 695;
+  const number = orderNumber ?? `LM-261025-${String(n).padStart(4, '0')}`;
+
+  const [id] = await db('orders').insert({
+    order_number: number,
+    user_id: user.id,
+    status,
+    subtotal_cents: subtotal,
+    shipping_cents: shipping,
+    total_cents: subtotal + shipping,
+    email: user.email,
+    created_at: createdAt,
+  });
+  await db('order_items').insert({
+    order_id: id,
+    variant_id: variant.id,
+    product_id: product.id,
+    product_slug: row.slug,
+    title: row.title,
+    color_name: variant.color_name,
+    size: variant.size,
+    image_url: image.url,
+    unit_price_cents: row.price_cents,
+    quantity,
+    line_total_cents: subtotal,
+  });
+  return { id, orderNumber: number };
+}

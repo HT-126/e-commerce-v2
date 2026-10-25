@@ -22,12 +22,12 @@ function toLine(row, quantity) {
 }
 
 // Prices a list of `{ variantId, quantity }` from the database. Unknown variants are left out; the rest
-// keep the order of the list.
-async function priceItems(items) {
+// keep the order of the list. `conn` is a transaction when the caller needs the prices inside one.
+export async function priceItems(items, conn = db) {
   const wanted = collapseItems(items);
   if (wanted.length === 0) return buildCart([]);
 
-  const rows = await db('variants')
+  const rows = await conn('variants')
     .join('products', 'products.id', 'variants.product_id')
     .leftJoin('product_images', function () {
       this.on('product_images.product_id', 'products.id').andOnVal('product_images.position', '=', 0);
