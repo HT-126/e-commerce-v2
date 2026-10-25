@@ -120,10 +120,13 @@ export default function ProductForm({ product }) {
     await persist(values);
   }
 
+  // The dialog stays open, showing "Working...", until the product is saved.
   async function confirmHide() {
-    const values = hiding;
-    setHiding(null);
-    await persist(values);
+    try {
+      await persist(hiding);
+    } finally {
+      setHiding(null);
+    }
   }
 
   const photosError = errors.images?.root?.message ?? errors.images?.message;
@@ -162,6 +165,14 @@ export default function ProductForm({ product }) {
                 </Select>
               )}
             />
+            {categories.isError && (
+              <p role="alert" className="text-sm text-destructive">
+                Could not load the categories.{' '}
+                <button type="button" onClick={() => categories.refetch()} className="underline underline-offset-4">
+                  Try again
+                </button>
+              </p>
+            )}
           </Field>
           <Field label="Price (USD)" htmlFor="price" error={errors.price?.message}>
             <Input
@@ -173,7 +184,7 @@ export default function ProductForm({ product }) {
             />
           </Field>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex min-h-11 items-center gap-3">
           <Controller
             control={control}
             name="isActive"
@@ -293,6 +304,7 @@ export default function ProductForm({ product }) {
         description="It disappears from the shop and its page shows Not found. Old orders keep it. You can make it active again later."
         confirmLabel="Yes, hide product"
         cancelLabel="Keep it active"
+        pending={saving}
         onConfirm={confirmHide}
       />
     </form>

@@ -156,6 +156,30 @@ describe('DataTable', () => {
     });
   });
 
+  describe('a page past the end', () => {
+    it('asks for the last page when the page has no rows but there are results', () => {
+      const { onPageChange } = renderTable({ rows: [], total: 45, page: 5 });
+
+      expect(onPageChange).toHaveBeenCalledWith(3);
+    });
+
+    it('does nothing on a page that has rows, or when there are no results at all', () => {
+      const first = renderTable({ page: 2 });
+      expect(first.onPageChange).not.toHaveBeenCalled();
+
+      const second = renderTable({ rows: [], total: 0, page: 1 });
+      expect(second.onPageChange).not.toHaveBeenCalled();
+    });
+
+    it('does nothing while the list is loading or has failed', () => {
+      const loading = renderTable({ rows: [], total: 45, page: 5, isPending: true });
+      expect(loading.onPageChange).not.toHaveBeenCalled();
+
+      const failed = renderTable({ rows: [], total: 45, page: 5, isError: true });
+      expect(failed.onPageChange).not.toHaveBeenCalled();
+    });
+  });
+
   describe('states', () => {
     it('shows a loading state, not the rows', () => {
       renderTable({ isPending: true, rows: [] });

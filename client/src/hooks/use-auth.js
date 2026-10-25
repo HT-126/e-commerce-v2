@@ -3,10 +3,10 @@ import { ApiError } from '../lib/api.js';
 import { CART_KEY } from '../lib/cart.js';
 import { ORDER_KEY, ORDERS_KEY } from '../lib/orders.js';
 import { MY_REVIEW_KEY } from '../lib/reviews.js';
+import { ME_KEY as ME } from '../lib/session.js';
 import { getMe, login, logout, register } from '../services/auth.js';
 import { useCartStore } from '../stores/cart-store.js';
 
-const ME = ['me'];
 
 // Who is signed in lives in TanStack Query (it is server data), never in a second copy.
 // `data` is the user, `null` for a guest, and `undefined` while it is still loading.

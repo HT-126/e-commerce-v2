@@ -40,7 +40,11 @@ function VariantRow({ variant, productId }) {
     if (stock !== String(variant.stock)) changes.stock = Number(stock);
 
     try {
-      await update.mutateAsync({ id: variant.id, changes });
+      const saved = await update.mutateAsync({ id: variant.id, changes });
+      // Show what the server kept ("007" became 7), so the boxes match it and Save goes off.
+      setColor(saved.color);
+      setSize(saved.size);
+      setStock(String(saved.stock));
       toast.success('Variant saved');
     } catch (failure) {
       setError(variantError(failure));

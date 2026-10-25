@@ -78,6 +78,16 @@ describe('VariantsSection: the variants of a product', () => {
       expect(sent(fetchMock)).toEqual([['PATCH', '/api/admin/variants/11', { stock: 0 }]]);
     });
 
+    it('shows what the server saved in the boxes ("007" becomes 7)', async () => {
+      renderVariants([variant()]);
+
+      fireEvent.change(stockBox(), { target: { value: '007' } });
+      fireEvent.click(saveButton());
+
+      await screen.findByText('Variant saved');
+      expect(stockBox()).toHaveValue('7');
+    });
+
     it('sends the color and the size when those are changed', async () => {
       const fetchMock = renderVariants([variant()]);
 

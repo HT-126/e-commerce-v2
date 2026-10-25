@@ -49,9 +49,9 @@ const aProduct = (overrides = {}) => ({
 
 // A fake API. `product`: what `GET /api/admin/products/7` returns (a status object for an error).
 // `save`: an answer for POST and PATCH of a product, instead of echoing it back.
-function renderPage({ url = '/admin/products/7', product = aProduct(), save } = {}) {
+function renderPage({ url = '/admin/products/7', product = aProduct(), save, categoriesAnswer } = {}) {
   const fetchMock = stubApi((requested, init) => {
-    if (requested === '/api/categories') return { body: { data: categories } };
+    if (requested === '/api/categories') return categoriesAnswer ?? { body: { data: categories } };
     if (requested === '/api/admin/products' && init?.method === 'POST') {
       return save ?? { status: 201, body: { data: aProduct({ ...JSON.parse(init.body), id: 9, categoryId: JSON.parse(init.body).categoryId, category: { name: 'Dresses', slug: 'dresses' }, variants: [] }) } };
     }
@@ -96,6 +96,13 @@ async function fillNewProduct() {
 }
 
 describe('admin ProductEditPage: a new product', () => {
+  it('says when the categories cannot be loaded, and lets the owner try again', async () => {
+    renderPage({ url: '/admin/products/new', categoriesAnswer: failure });
+
+    expect(await screen.findByText(/Could not load the categories\./)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
   it('shows a blank form, Active on, and one photo row', async () => {
     renderPage({ url: '/admin/products/new' });
 
@@ -364,6 +371,30 @@ describe('admin ProductEditPage: an existing product', () => {
 
       expect(await screen.findByText('Product saved')).toBeInTheDocument();
       expect(bodyOf(writes(fetchMock, 'PATCH')[0]).isActive).toBe(false);
+    });
+
+    it('keeps the dialog open, showing "Working...", until the product is saved', async () => {
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const fetchMock = renderPage();
+      const answer = fetchMock.getMockImplementation();
+      fetchMock.mockImplementation(async (url, init) => {
+        if (init?.method === 'PATCH') await gate;
+        return answer(url, init);
+      });
+      await screen.findByRole('heading', { level: 1 });
+
+      hide();
+      fireEvent.click(save());
+      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Yes, hide product' }));
+
+      const dialog = await screen.findByRole('alertdialog');
+      expect(await within(dialog).findByRole('button', { name: 'Working...' })).toBeDisabled();
+      release();
+      expect(await screen.findByText('Product saved')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     });
 
     it('does not ask when other fields are saved and the product stays active', async () => {

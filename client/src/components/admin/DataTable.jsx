@@ -1,5 +1,5 @@
 import { rowPaginationFeature, rowSortingFeature, tableFeatures, useTable } from '@tanstack/react-table';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -84,6 +84,12 @@ export default function DataTable({
   const pageCount = Math.max(1, table.getPageCount());
   const bodyRows = table.getRowModel().rows;
 
+  // The page has no rows left (its last row was deleted, or the URL was typed): show the last page.
+  const pastTheEnd = !isPending && !isError && total > 0 && bodyRows.length === 0 && page > pageCount;
+  useEffect(() => {
+    if (pastTheEnd) onPageChange?.(pageCount);
+  }, [pastTheEnd, pageCount, onPageChange]);
+
   return (
     <div>
       <div className="rounded-xl border bg-white">
@@ -101,7 +107,7 @@ export default function DataTable({
                         <button
                           type="button"
                           onClick={header.column.getToggleSortingHandler()}
-                          className="inline-flex items-center gap-1 hover:text-foreground"
+                          className="inline-flex min-h-11 items-center gap-1 hover:text-foreground"
                         >
                           <table.FlexRender header={header} />
                           <span aria-hidden="true">{direction ? SORT_ARROW[direction] : ''}</span>
