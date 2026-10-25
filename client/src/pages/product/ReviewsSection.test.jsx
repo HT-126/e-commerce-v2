@@ -56,7 +56,8 @@ function renderReviews({
       return mineAnswer ?? { body: { data: { review: current, canReview } } };
     }
     if (requested.includes('/reviews?')) {
-      return listAnswer ?? { body: { data: { ...list, page: 1, limit: 10 } } };
+      const answer = typeof listAnswer === 'function' ? listAnswer(requested) : listAnswer;
+      return answer ?? { body: { data: { ...list, page: 1, limit: 10 } } };
     }
     return { status: 404, body: { error: { message: 'Not found' } } };
   });
@@ -292,6 +293,17 @@ describe('ReviewsSection: my review', () => {
     expect(screen.getByRole('heading', { name: 'Your review' })).toBeInTheDocument();
   });
 
+  it('removes the "could not delete" message when the user cancels', async () => {
+    renderReviews({ user: aUser(), canReview: true, mine: myReview(), del: failure });
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, delete' }));
+    await screen.findByText('Could not delete your review. Please try again.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByText('Could not delete your review. Please try again.')).not.toBeInTheDocument();
+  });
+
   it('lets a user whose purchase no longer counts delete the review, but not change it', async () => {
     renderReviews({ user: aUser(), canReview: false, mine: myReview() });
 
@@ -362,6 +374,21 @@ describe('ReviewsSection: the list', () => {
     await waitFor(() =>
       expect(calledUrls(fetchMock)).toContain('/api/products/midi-dress/reviews?page=2&limit=10'),
     );
+  });
+
+  it('goes back to the last page when the page in the URL has no reviews left', async () => {
+    const empty = { body: { data: { items: [], page: 5, limit: 10, total: 12 } } };
+    const fetchMock = renderReviews({
+      url: '/products/midi-dress?reviewPage=5',
+      listAnswer: (requested) =>
+        requested.includes('page=5')
+          ? empty
+          : { body: { data: { items: [aReview({ comment: 'On the last page' })], page: 2, limit: 10, total: 12 } } },
+    });
+
+    expect(await screen.findByText('On the last page')).toBeInTheDocument();
+    expect(calledUrls(fetchMock)).toContain('/api/products/midi-dress/reviews?page=2&limit=10');
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
   });
 
   it('shows no pagination for a single page', async () => {

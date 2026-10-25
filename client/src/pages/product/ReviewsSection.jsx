@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import Button from '../../components/Button.jsx';
 import Pagination from '../../components/Pagination.jsx';
@@ -138,7 +138,7 @@ function MyReview({ slug }) {
           <RatingStars rating={review.rating} />
           <span className="text-sm text-ink-soft">{formatDate(review.createdAt)}</span>
         </div>
-        {review.comment && <p className="mt-2 text-sm leading-relaxed">{review.comment}</p>}
+        {review.comment && <p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed">{review.comment}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {canReview && (
             <Button variant="outline" onClick={() => setEditing(true)}>
@@ -154,12 +154,24 @@ function MyReview({ slug }) {
               >
                 Yes, delete
               </Button>
-              <Button variant="outline" onClick={() => setConfirming(false)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  remove.reset();
+                  setConfirming(false);
+                }}
+              >
                 Cancel
               </Button>
             </>
           ) : (
-            <Button variant="outline" onClick={() => setConfirming(true)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                remove.reset();
+                setConfirming(true);
+              }}
+            >
               Delete
             </Button>
           )}
@@ -193,6 +205,16 @@ function ReviewList({ slug }) {
     setSearchParams(params, { preventScrollReset: true });
   }
 
+  // The page has no reviews left (the last one on it was deleted, or the URL was typed): show the last page.
+  const pastTheEnd = Boolean(data) && !isPlaceholderData && data.items.length === 0 && data.total > 0 && page > 1;
+  useEffect(() => {
+    if (!pastTheEnd) return;
+    const params = new URLSearchParams(searchParams);
+    if (totalPages > 1) params.set('reviewPage', String(totalPages));
+    else params.delete('reviewPage');
+    setSearchParams(params, { replace: true, preventScrollReset: true });
+  }, [pastTheEnd, totalPages, searchParams, setSearchParams]);
+
   if (isPending) {
     return (
       <div role="status" aria-label="Loading reviews" className="animate-pulse space-y-3">
@@ -225,11 +247,10 @@ function ReviewList({ slug }) {
               <span className="text-sm font-medium">{review.authorName}</span>
               <span className="text-sm text-ink-soft">{formatDate(review.createdAt)}</span>
             </div>
-            <p className="mt-2 text-sm leading-relaxed">{review.comment}</p>
+            <p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed">{review.comment}</p>
           </li>
         ))}
       </ul>
-      {/* A page past the end (typed in the URL) still gets a way back: Previous jumps to the last page. */}
       <Pagination page={page} totalPages={totalPages} onChange={goToPage} />
     </>
   );

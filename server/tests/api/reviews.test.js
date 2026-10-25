@@ -230,6 +230,39 @@ describe('PUT /api/products/:slug/reviews/mine', () => {
   });
 });
 
+describe('review changes and the product lock', () => {
+  it('leaves one review and a matching rating when the same user saves twice at once', async () => {
+    const product = await ratedProduct();
+    const { agent } = await buyer(product);
+
+    const [a, b] = await Promise.all([
+      agent.put(mine(product)).send({ rating: 5, comment: 'First' }),
+      agent.put(mine(product)).send({ rating: 1, comment: 'Second' }),
+    ]);
+
+    expect([a.status, b.status]).toEqual([200, 200]);
+    const rows = await reviewsOf(product);
+    expect(rows).toHaveLength(1);
+    // The shown rating matches whichever save came last: (40 + 5) / 11 = 4.1 or (40 + 1) / 11 = 3.7.
+    expect(await productRow(product)).toMatchObject({
+      rating_avg: rows[0].rating === 5 ? '4.1' : '3.7',
+      review_count: 11,
+    });
+  });
+
+  it('keeps the right numbers when a save and a delete of the same review happen at once', async () => {
+    const product = await ratedProduct();
+    const { agent } = await buyer(product);
+    await agent.put(mine(product)).send({ rating: 5, comment: 'Here' });
+
+    await Promise.all([agent.delete(mine(product)), agent.put(mine(product)).send({ rating: 1 })]);
+
+    const rows = await reviewsOf(product);
+    const expected = rows.length === 0 ? { rating_avg: '4.0', review_count: 10 } : { rating_avg: '3.7', review_count: 11 };
+    expect(await productRow(product)).toMatchObject(expected);
+  });
+});
+
 describe('DELETE /api/products/:slug/reviews/mine', () => {
   it('removes my review and gives the shown rating back its dataset values', async () => {
     const product = await ratedProduct();

@@ -1,5 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderRoute, stubApi } from '../../test-utils.jsx';
 import ProductPage from './ProductPage.jsx';
 
@@ -178,6 +178,41 @@ describe('ProductPage', () => {
 
     expect(await screen.findByText(/Average from 8 reviews/)).toBeInTheDocument();
     expect(screen.getByText('4.8 · 8 reviews')).toBeInTheDocument();
+  });
+
+  describe('the #reviews link from an order', () => {
+    const scrollIntoView = vi.fn();
+
+    beforeEach(() => {
+      scrollIntoView.mockClear();
+      Element.prototype.scrollIntoView = scrollIntoView;
+    });
+
+    function openAt(url) {
+      stubApi((requested) => {
+        if (requested === '/api/auth/me') return { status: 401, body: { error: { message: 'x', code: 'UNAUTHORIZED' } } };
+        if (requested.includes('/reviews?')) return { body: { data: { items: [], page: 1, limit: 10, total: 0 } } };
+        if (requested.endsWith('/related')) return { body: { data: [] } };
+        return { body: { data: baseProduct } };
+      });
+      renderRoute(<ProductPage />, { path: '/products/:slug', url });
+    }
+
+    it('scrolls to the reviews once the product has loaded, and only once', async () => {
+      openAt('/products/midi-dress#reviews');
+      await screen.findByRole('heading', { level: 1, name: 'Midi Dress' });
+
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+      expect(document.getElementById('reviews')).toBeInTheDocument();
+      expect(scrollIntoView.mock.contexts[0]).toBe(document.getElementById('reviews'));
+    });
+
+    it('does not scroll without the link', async () => {
+      openAt('/products/midi-dress');
+      await screen.findByRole('heading', { level: 1, name: 'Midi Dress' });
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
   });
 
   it('shows the not found page for an unknown product', async () => {

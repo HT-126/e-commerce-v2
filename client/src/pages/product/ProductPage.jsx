@@ -1,4 +1,5 @@
-import { useParams } from 'react-router';
+import { useEffect, useRef } from 'react';
+import { useLocation, useParams } from 'react-router';
 import Button from '../../components/Button.jsx';
 import ProductGrid from '../../components/ProductGrid.jsx';
 import { useProduct, useRelatedProducts } from '../../hooks/use-catalog.js';
@@ -52,6 +53,17 @@ function Related({ slug }) {
 export default function ProductPage() {
   const { slug } = useParams();
   const { data: product, isPending, isError, error, refetch } = useProduct(slug);
+
+  // The "Write a review" link from an order ends in `#reviews`, but that place only exists once the product
+  // has loaded, so the browser cannot scroll to it by itself. Once per visit: a refetch (after a review is
+  // saved) must not jump the page again.
+  const { hash } = useLocation();
+  const scrolledTo = useRef(null);
+  useEffect(() => {
+    if (!product || hash !== '#reviews' || scrolledTo.current === `${slug}${hash}`) return;
+    scrolledTo.current = `${slug}${hash}`;
+    document.getElementById('reviews')?.scrollIntoView();
+  }, [product, hash, slug]);
 
   if (isPending) return <ProductSkeleton />;
   if (isError && error.status === 404) return <NotFoundPage />;
