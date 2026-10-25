@@ -45,12 +45,30 @@ function cardQuery() {
     );
 }
 
-function applyFilters(query, { category, maxPriceCents, q }) {
+// Color and size must match the same in-stock variant ("black AND M" is one black M you can buy).
+function applyVariantFilters(query, { color, size }) {
+  const hasColor = color?.length > 0;
+  const hasSize = size?.length > 0;
+  if (!hasColor && !hasSize) return;
+
+  query.whereExists(function () {
+    this.select(db.raw('1'))
+      .from('variants')
+      .whereRaw('variants.product_id = products.id')
+      .where('variants.stock', '>', 0);
+    if (hasColor) this.whereIn('variants.color_group', color);
+    if (hasSize) this.whereIn('variants.size', size);
+  });
+}
+
+function applyFilters(query, { category, minPriceCents, maxPriceCents, q, color, size }) {
   if (category) {
     query.whereIn('products.category_id', db('categories').select('id').where({ slug: category }));
   }
+  if (minPriceCents !== undefined) query.where('products.price_cents', '>=', minPriceCents);
   if (maxPriceCents !== undefined) query.where('products.price_cents', '<=', maxPriceCents);
   if (q) query.where('products.title', 'like', `%${escapeLike(q)}%`);
+  applyVariantFilters(query, { color, size });
   return query;
 }
 

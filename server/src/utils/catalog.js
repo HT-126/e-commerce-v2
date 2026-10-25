@@ -34,3 +34,42 @@ export function variantOptions(variants) {
     sizes: [...new Set(variants.map((v) => v.size))],
   };
 }
+
+// The sizes people expect first, in order. Number sizes (4, 6, 16W, 9(29)) come after, in natural order.
+const LETTER_SIZES = [
+  'XS',
+  'S',
+  'S/M',
+  'M',
+  'M/L',
+  'L',
+  'L/XL',
+  'XL',
+  'XL/1XL',
+  '1XL',
+  '1XL/2XL',
+  '2XL',
+  '2XL/3XL',
+  '3XL',
+  '4XL',
+  '5XL',
+  '6XL',
+  '0XL',
+  '1X',
+  '2X',
+  '3X',
+  '4X',
+  'One Size',
+];
+const SIZE_RANK = new Map(LETTER_SIZES.map((size, index) => [size, index]));
+
+export function sortSizes(sizes) {
+  return [...sizes].sort((a, b) => {
+    const rankA = SIZE_RANK.get(a);
+    const rankB = SIZE_RANK.get(b);
+    if (rankA !== undefined && rankB !== undefined) return rankA - rankB;
+    if (rankA !== undefined) return -1;
+    if (rankB !== undefined) return 1;
+    return a.localeCompare(b, 'en', { numeric: true });
+  });
+}

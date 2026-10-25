@@ -50,6 +50,15 @@ describe('mapProduct', () => {
     expect(product.review_count).toBe(0);
   });
 
+  it('sets the color group of each variant from the cleaned color name', () => {
+    const { variants } = mapProduct(source());
+
+    expect(variants.map((v) => [v.color_name, v.color_group])).toEqual([
+      ['Black', 'black'],
+      ['Blush Pink', 'pink'],
+    ]);
+  });
+
   it('seeds stock 10 or 0 and keeps the first of two variants that clean to the same value', () => {
     const warn = vi.fn();
     const { variants } = mapProduct(source(), warn);

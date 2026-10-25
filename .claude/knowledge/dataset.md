@@ -72,6 +72,12 @@ Header menu order = table order.
 - Size: trim, then only these fixes: `One size`, `onesize` to `One Size`; `XXL` to `2XL`; `XXXL` to `3XL`; `SM` to `S/M`; `ML` to `M/L`. Keep every other value as it is (number sizes like `8`, `0(24)` and plus sizes like `16W` are real sizes).
 - If cleaning makes two variants of one product equal (same color and size), keep the first and log a warning.
 
+## Color groups (for the shop filter)
+`variants.color_group` is set from the cleaned `color_name` by `colorGroupFor()` in `server/src/utils/color-groups.js` (the seed, the migration backfill and, later, admin use the same function).
+- Groups, in display order: `black`, `white`, `neutral` (beige, cream, ivory, khaki, tan, camel, taupe, mocha, sand...), `brown`, `gray`, `red` (red, burgundy, wine, scarlet...), `pink`, `orange`, `yellow`, `green`, `blue` (navy, teal, turquoise...), `purple`, `multicolor` (floral, leopard, print, multicolor...), `other`.
+- Ordered keyword rules. For names like `Black/Mauve` the first part decides; if it matches nothing, the next part is tried. Anything unmatched is `other`.
+- Goal: `other` stays under about 5% of variants. The real share is in the migration notes of the change that added it.
+
 ## Seed rules
 - Seed script order: categories, products, images, variants, users, demo order. Insert in batches (`knex.batchInsert`, 500 rows).
 - The seed runs only on an empty database. If products already exist, it prints "Seed skipped: database not empty" and exits with code 0. Orders point to products, so the catalog cannot be emptied alone.

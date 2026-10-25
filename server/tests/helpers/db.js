@@ -1,4 +1,5 @@
 import { db } from '../../src/db/knex.js';
+import { colorGroupFor } from '../../src/utils/color-groups.js';
 
 // Children first, so foreign keys never block the delete.
 const TABLES = [
@@ -66,6 +67,7 @@ export async function createProduct({
         product_id: id,
         sku: `SKU-${n}-${position}`,
         color_name: v.color,
+        color_group: v.colorGroup ?? colorGroupFor(v.color),
         size: v.size,
         stock: v.stock,
         position,

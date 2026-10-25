@@ -53,13 +53,23 @@ Money is always integer cents. Dates are ISO 8601 strings. Customer routes never
 - Response `200`: `{ data: [{ id, name, slug }] }` in menu order.
 
 ### `GET /api/products`
-- Query (all optional): `category` (slug), `sort` (`newest` | `rating` | `price_asc` | `price_desc`, default `newest`), `maxPriceCents`, `q` (search in title), `page` (default 1), `limit` (default 12, max 48)
+- Query (all optional): `category` (slug), `sort` (`newest` | `rating` | `price_asc` | `price_desc`, default `newest`), `minPriceCents`, `maxPriceCents`, `q` (search in title), `color`, `size`, `page` (default 1, max 10000), `limit` (default 12, max 48)
+- `color` is a comma list of color group keys (`black,white`; keys come from `GET /api/filters`). `size` is a comma list (`M,L`). Up to 15 colors and 20 sizes, each up to 20 characters; values are trimmed and duplicates removed. Unknown values match nothing (empty list).
+- Variant filters: a product matches only when it has **one in-stock variant** whose color group is in `color` AND whose size is in `size` (each condition only if sent, both on the same variant). Without `color` and `size`, sold-out products still appear.
+- Price: `minPriceCents <= price <= maxPriceCents`. `minPriceCents` greater than `maxPriceCents` is rejected with `400 VALIDATION_ERROR`.
+- All filters combine with `category`, `q`, `sort` and paging.
 - Home tabs: New arrivals = `sort=newest`, Top rated = `sort=rating`, Under $45 = `maxPriceCents=4499`.
-- A `limit` above 48 is rejected with `400 VALIDATION_ERROR` (not clamped). An empty `q`, `category` or `maxPriceCents` counts as not sent. An unknown `category` slug gives an empty list.
+- A `limit` above 48 is rejected with `400 VALIDATION_ERROR` (not clamped). An empty `q`, `category`, `color`, `size`, `minPriceCents` or `maxPriceCents` counts as not sent. An unknown `category` slug gives an empty list.
 - Inactive products never appear. `soldOut` is true when no variant has stock; the stock number is never returned.
 - Response `200`: `{ data: { items: [productCard], page, limit, total } }`
 - `productCard` = `{ id, slug, title, priceCents, ratingAvg, reviewCount, imageUrl, imageAlt, soldOut }`
 - Schema: `listProductsSchema` (query)
+
+### `GET /api/filters`
+Options for the shop filters.
+- Response `200`: `{ data: { colors: [{ key, label }], sizes: [string] } }`
+- `colors`: color groups (see `dataset.md`) that exist on at least one active product, in group order. `sizes`: sizes that exist on active products, in a fixed order (XS, S, M, L, XL, 2XL, 3XL ..., One Size, then number sizes).
+- No stock numbers. Never fails for lack of data (empty lists).
 
 ### `GET /api/products/:slug`
 - Response `200`: `{ data: product }`
