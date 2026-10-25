@@ -88,14 +88,14 @@ describe('Header', () => {
 
     it('shows a shadow only after the page has scrolled', () => {
       renderHeader();
-      const header = screen.getByRole('banner');
-      expect(header).not.toHaveClass('shadow-md');
+      const pill = screen.getByRole('banner').firstElementChild;
+      expect(pill).not.toHaveClass('shadow-md');
 
       scrollTo(120);
-      expect(header).toHaveClass('shadow-md');
+      expect(pill).toHaveClass('shadow-md');
 
       scrollTo(0);
-      expect(header).not.toHaveClass('shadow-md');
+      expect(pill).not.toHaveClass('shadow-md');
     });
   });
 

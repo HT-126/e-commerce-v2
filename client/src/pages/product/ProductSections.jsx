@@ -70,7 +70,7 @@ export function SizeChartSection({ sizeChart, className = '' }) {
   if (!sizeChart) return null;
 
   return (
-    <section id="size-chart" className={`scroll-mt-20 rounded-[28px] bg-white p-8 ${className}`}>
+    <section id="size-chart" className={`scroll-mt-24 rounded-[28px] bg-white p-8 ${className}`}>
       <h2 className="font-serif text-3xl">
         Size <span className="italic text-highlight">chart</span>{' '}
         <span className="font-sans text-sm text-ink-soft">(inches)</span>
