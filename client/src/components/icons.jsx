@@ -91,3 +91,10 @@ export const CheckIcon = (props) => (
     <path d="m5 12 5 5 9-10" />
   </Icon>
 );
+
+export const UserIcon = (props) => (
+  <Icon {...props}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
+  </Icon>
+);
