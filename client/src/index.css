@@ -63,14 +63,16 @@
   --font-serif: 'Newsreader', serif;
   --font-sans: 'Instrument Sans', sans-serif;
 
-  /* Home slogans: fade in once, 0.8s. `both` keeps a delayed one hidden until it starts. */
-  --animate-fade-in: fade-in 0.8s ease-out both;
-  @keyframes fade-in {
+  /* Home slogans: revealed from left to right once, 1.2s. `both` keeps a delayed one hidden until it starts.
+     The shown area is 0.5em larger than the text box on every side, so italic overhangs and descenders are
+     not cut off after the wipe. */
+  --animate-wipe-in: wipe-in 1.2s ease-out both;
+  @keyframes wipe-in {
     from {
-      opacity: 0;
+      clip-path: inset(-0.5em 100% -0.5em 0);
     }
     to {
-      opacity: 1;
+      clip-path: inset(-0.5em -0.5em -0.5em -0.5em);
     }
   }
 }
