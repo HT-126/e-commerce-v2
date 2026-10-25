@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useSearchParams } from 'react-router';
 import { useCategories } from '../hooks/use-catalog.js';
-import { useScrolled } from '../hooks/use-scrolled.js';
 import { CloseIcon, MenuIcon, SearchIcon } from './icons.jsx';
 
 const baseLink = 'rounded-full px-1 py-2 text-sm hover:text-highlight';
@@ -17,7 +16,6 @@ export default function Header() {
   const menuButtonRef = useRef(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const scrolled = useScrolled();
   const { data: categories = [] } = useCategories();
   const close = () => {
     setMenuOpen(false);
@@ -82,14 +80,8 @@ export default function Header() {
   ];
 
   return (
-    // The original design (a rounded white pill), made sticky: it floats above the page content
-    // (z-40, filter panels are z-30), 64px high. The shadow gets deeper once the page has scrolled.
-    <header ref={headerRef} className="sticky top-0 z-40 mx-auto w-full max-w-7xl px-6 pt-4">
-      <div
-        className={`flex h-16 items-center justify-between gap-4 rounded-full bg-white px-5 transition-shadow ${
-          scrolled ? 'shadow-md' : 'shadow-sm'
-        }`}
-      >
+    <header ref={headerRef} className="mx-auto w-full max-w-7xl px-6 pt-4">
+      <div className="flex items-center justify-between gap-4 rounded-full bg-white px-5 py-2 shadow-sm">
         <Link to="/" className="font-serif text-2xl" onClick={close}>
           Lumière
         </Link>

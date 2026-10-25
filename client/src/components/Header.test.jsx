@@ -78,27 +78,6 @@ describe('Header', () => {
     expect(screen.getAllByRole('navigation', { name: 'Main' })).toHaveLength(1);
   });
 
-  describe('shadow', () => {
-    const scrollTo = (y) => {
-      Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
-      fireEvent.scroll(window);
-    };
-
-    afterEach(() => scrollTo(0));
-
-    it('shows a shadow only after the page has scrolled', () => {
-      renderHeader();
-      const pill = screen.getByRole('banner').firstElementChild;
-      expect(pill).not.toHaveClass('shadow-md');
-
-      scrollTo(120);
-      expect(pill).toHaveClass('shadow-md');
-
-      scrollTo(0);
-      expect(pill).not.toHaveClass('shadow-md');
-    });
-  });
-
   describe('search', () => {
     it('opens a search field from the Search button', () => {
       renderHeader();
