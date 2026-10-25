@@ -257,6 +257,24 @@ describe('CartPage', () => {
       );
     });
 
+    it('removes the message once the shopper changes the bag', async () => {
+      renderCart({
+        user: aUser(),
+        bag: [lineFor(1, 1)],
+        pay: { status: 409, body: { error: { code: 'STOCK_CHANGED', message: 'x', details: [] } } },
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Pay $46.95' }));
+      await screen.findByText('Some items changed while you were paying. Nothing was charged.');
+
+      fireEvent.click(within(rowOf('Dress 1')).getByRole('button', { name: 'Increase quantity' }));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByText('Some items changed while you were paying. Nothing was charged.'),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
     it('says nothing was charged for any other failure, and lets the user try again', async () => {
       renderCart({ user: aUser(), bag: [lineFor(1, 1)], pay: failure });
       fireEvent.click(await screen.findByRole('button', { name: 'Pay $46.95' }));

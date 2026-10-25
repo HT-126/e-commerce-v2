@@ -104,8 +104,15 @@ export default function CartPage() {
   const placeOrder = usePlaceOrder();
   const navigate = useNavigate();
 
-  const changeQuantity = (variantId, quantity) => setQuantity.mutate({ variantId, quantity });
-  const remove = (variantId) => removeLine.mutate({ variantId });
+  // Changing the bag answers the message about the last "Pay": it no longer describes this bag.
+  const changeQuantity = (variantId, quantity) => {
+    placeOrder.reset();
+    setQuantity.mutate({ variantId, quantity });
+  };
+  const remove = (variantId) => {
+    placeOrder.reset();
+    removeLine.mutate({ variantId });
+  };
 
   // A refused order is shown under the button (`placeOrder.error`), so there is nothing to catch here.
   async function pay() {

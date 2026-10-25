@@ -1,7 +1,8 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { db } from '../../src/db/knex.js';
+import { buildOrderNumber } from '../../src/utils/order.js';
 import {
   cleanTables,
   createCartItem,
@@ -10,6 +11,12 @@ import {
   createUser,
   login,
 } from '../helpers/db.js';
+
+// Works as before, but a test can make the next draw return a number that is already taken.
+vi.mock('../../src/utils/order.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, buildOrderNumber: vi.fn(actual.buildOrderNumber) };
+});
 
 const app = createApp();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -155,6 +162,22 @@ describe('POST /api/orders', () => {
     expect(await stockOf(bad.variantId)).toBe(options.stock);
   });
 
+  it('draws another order number when the first one is already taken', async () => {
+    const { product, variantId } = await stocked(5);
+    const { agent } = await shopper(variantId);
+    const today = new Date().toISOString().slice(2, 10).replaceAll('-', '');
+    const taken = `LM-${today}-1234`;
+    await createOrder({ user: await createUser(), product, orderNumber: taken });
+    // The first draw is the number that is taken; after that the numbers are random again.
+    vi.mocked(buildOrderNumber).mockReturnValueOnce(taken);
+
+    const res = await agent.post('/api/orders');
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.orderNumber).not.toBe(taken);
+    expect(res.body.data.orderNumber).toMatch(/^LM-\d{6}-\d{4}$/);
+  });
+
   it('needs a signed-in user', async () => {
     const res = await request(app).post('/api/orders');
 
@@ -252,7 +275,8 @@ describe('POST /api/orders when the stock changes while paying', () => {
     const statuses = [a.status, b.status];
     expect(statuses.filter((status) => status === 201)).toHaveLength(1);
     // The loser is told 409 when it was already paying. If the winner finished before it even read its
-    // bag, it sees the line as sold out and gets 400 instead. Either way nothing is charged.
+    // bag, it sees the line as sold out and gets 400 instead. Either way nothing is charged. This test checks
+    // the outcome (one order, stock 0); the tests above make the 409 happen every time, without timing luck.
     const loser = a.status === 201 ? b : a;
     expect([409, 400]).toContain(loser.status);
     expect(['STOCK_CHANGED', 'CART_NOT_READY']).toContain(loser.body.error.code);
@@ -379,6 +403,15 @@ describe('GET /api/orders/:orderNumber', () => {
       },
     ]);
     expect(keysIn(res)).not.toContain('"stock"');
+  });
+
+  it('rejects an order number longer than 20 characters with 400', async () => {
+    const agent = await login(app, await createUser());
+
+    const res = await agent.get(`/api/orders/${'LM-'.padEnd(21, '9')}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
   it("answers 404 for another user's order, like one that does not exist", async () => {

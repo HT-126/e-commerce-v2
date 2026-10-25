@@ -1,4 +1,5 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { anOrder, anOrderItem, renderRoute, stubApi } from '../../test-utils.jsx';
 import OrderPage from './OrderPage.jsx';
@@ -11,7 +12,17 @@ const failure = { status: 500, body: { error: { message: 'Something went wrong' 
 // `state`: what the cart page passes when the order was just placed.
 function renderOrder(answer, { state } = {}) {
   stubApi(() => answer);
-  renderRoute(<OrderPage />, { path: '/orders/:orderNumber', url: '/orders/LM-261025-4821', state });
+  // Shows the router state the page is left with.
+  function State() {
+    return <p data-testid="state">{JSON.stringify(useLocation().state)}</p>;
+  }
+  renderRoute(
+    <>
+      <OrderPage />
+      <State />
+    </>,
+    { path: '/orders/:orderNumber', url: '/orders/LM-261025-4821', state },
+  );
 }
 
 describe('OrderPage', () => {
@@ -58,6 +69,13 @@ describe('OrderPage', () => {
   it('thanks the shopper right after paying', async () => {
     renderOrder({ body: { data: anOrder() } }, { state: { placed: true } });
 
+    expect(await screen.findByText('Thank you! Your order is confirmed.')).toBeInTheDocument();
+  });
+
+  it('removes "placed" from the history entry, so a refresh or Back does not thank the shopper again', async () => {
+    renderOrder({ body: { data: anOrder() } }, { state: { placed: true } });
+
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
     expect(await screen.findByText('Thank you! Your order is confirmed.')).toBeInTheDocument();
   });
 

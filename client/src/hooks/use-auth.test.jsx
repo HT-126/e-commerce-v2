@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCartStore } from '../stores/cart-store.js';
-import { aCart, aUser, stubApi } from '../test-utils.jsx';
+import { aCart, anOrder, aUser, stubApi } from '../test-utils.jsx';
 import { useLogin, useLogout, useMe, useRegister } from './use-auth.js';
 
 afterEach(() => {
@@ -95,6 +95,8 @@ describe('useLogout', () => {
       useCartStore.setState({ items: [{ variantId: 1, quantity: 2 }] });
       queryClient.setQueryData(['cart'], aCart());
       queryClient.setQueryData(['cart', 'quote', []], aCart());
+      queryClient.setQueryData(['orders', { page: 1, limit: 10 }], { items: [], total: 0 });
+      queryClient.setQueryData(['order', 'LM-261025-4821'], anOrder());
     };
 
     it('is emptied in the browser after a successful sign out', async () => {
@@ -106,6 +108,16 @@ describe('useLogout', () => {
       expect(useCartStore.getState().items).toEqual([]);
       expect(queryClient.getQueryData(['cart'])).toBeUndefined();
       expect(queryClient.getQueryData(['cart', 'quote', []])).toBeUndefined();
+    });
+
+    it('takes the orders out of the cache too after a successful sign out', async () => {
+      const { queryClient, logout } = await signedIn({ status: 204 });
+      withBags(queryClient);
+
+      await act(() => logout.result.current.mutateAsync());
+
+      expect(queryClient.getQueryData(['orders', { page: 1, limit: 10 }])).toBeUndefined();
+      expect(queryClient.getQueryData(['order', 'LM-261025-4821'])).toBeUndefined();
     });
 
     it('is emptied too when the session was already over (401)', async () => {
@@ -147,6 +159,19 @@ describe('signing in', () => {
 
     expect(queryClient.getQueryData(['cart'])).toBeUndefined();
     expect(queryClient.getQueryData(['me'])).toEqual(aUser({ id: 2 }));
+  });
+
+  it("drops the previous user's orders from the cache, so the next user never sees them", async () => {
+    stubApi(() => ({ body: { data: { user: aUser({ id: 2 }) } } }));
+    const { queryClient, wrapper } = setup();
+    queryClient.setQueryData(['orders', { page: 1, limit: 10 }], { items: [{}], total: 1 });
+    queryClient.setQueryData(['order', 'LM-261025-4821'], anOrder());
+    const { result } = renderHook(() => useLogin(), { wrapper });
+
+    await act(() => result.current.mutateAsync({ email: 'b@example.com', password: 'password123' }));
+
+    expect(queryClient.getQueryData(['orders', { page: 1, limit: 10 }])).toBeUndefined();
+    expect(queryClient.getQueryData(['order', 'LM-261025-4821'])).toBeUndefined();
   });
 
   it('does the same after registering', async () => {

@@ -1,4 +1,5 @@
-import { Link, useLocation, useParams } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import Button from '../../components/Button.jsx';
 import { useOrder } from '../../hooks/use-orders.js';
 import { formatDate } from '../../lib/format-date.js';
@@ -59,7 +60,14 @@ function Row({ label, value, strong = false }) {
 // kept with the order, not the live product.
 export default function OrderPage() {
   const { orderNumber } = useParams();
-  const { state } = useLocation();
+  const location = useLocation();
+  const navigate = useNavigate();
+  // The cart page opens this page with `placed`. Keep it for this visit only, then remove it from the
+  // history entry, so a refresh or the Back button later does not show "Thank you" for an old order.
+  const [justPlaced] = useState(() => Boolean(location.state?.placed));
+  useEffect(() => {
+    if (justPlaced) navigate(location.pathname, { replace: true, state: null });
+  }, [justPlaced, navigate, location.pathname]);
   const { data: order, isPending, isError, error, refetch } = useOrder(orderNumber);
 
   if (isPending) return <OrderSkeleton />;
@@ -77,7 +85,7 @@ export default function OrderPage() {
 
   return (
     <section>
-      {state?.placed && (
+      {justPlaced && (
         <p role="status" className="mb-6 rounded-2xl bg-white px-5 py-3 text-sm">
           Thank you! Your order is confirmed.
         </p>

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { Route, useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { aUser, renderRoute, stubApi } from '../test-utils.jsx';
@@ -37,6 +37,24 @@ describe('RequireUser', () => {
 
   it('shows the page to a signed-in user', async () => {
     renderGuarded({ body: { data: { user: aUser() } } });
+
+    expect(await screen.findByText('secret page')).toBeInTheDocument();
+  });
+
+  it('does not send anyone to sign in when the check itself fails, and lets them try again', async () => {
+    let answer = { status: 500, body: { error: { message: 'Something went wrong' } } };
+    stubApi(() => answer);
+    renderRoute(
+      <RequireUser>
+        <p>secret page</p>
+      </RequireUser>,
+      { path: '/account/orders', url: '/account/orders', extraRoutes: <Route path="/login" element={<SignInPage />} /> },
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not check that you are signed in.');
+    expect(screen.queryByTestId('sign-in')).not.toBeInTheDocument();
+    answer = { body: { data: { user: aUser() } } };
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(await screen.findByText('secret page')).toBeInTheDocument();
   });
