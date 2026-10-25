@@ -70,7 +70,7 @@ In `server/`:
 
 ## 9. Verify (all must pass)
 1. `docker compose ps` shows MySQL healthy.
-2. `npm run data:download` then `npm run db:reset` in `server/` works and prints: 8 categories, 2,242 products (2,178 with a size chart), 17,022 variants, 2 users, 1 order. Running `npm run seed` again stops with the "not empty" message.
+2. `npm run data:download` then `npm run db:reset` in `server/` works and prints: 8 categories, 2,242 products (2,174 with a size chart), 17,022 variants, 2 users, 1 order. Running `npm run seed` again stops with the "not empty" message.
 3. `npm test` and `npm run lint` pass in `server/` and `client/`. `npm run build` passes in `client/`.
 4. Ask the user to import the files in `postman/` (see `postman/README.md`) and run the "Foundation" folder: `GET /api/health` returns 200 with `status: 'ok'`.
 5. With both dev servers running, `http://localhost:5174` shows the home page with the health status (the proxy works).

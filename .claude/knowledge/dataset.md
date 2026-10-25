@@ -17,7 +17,7 @@ The repo updates every Sunday. Always import the same version so seeds give the 
 - Stock: only `in_stock` (true/false). No stock numbers.
 - Colors: names only, no color codes. Many spellings (`BLACK/MAUVE`, `Ash Mocha`, `AS SHOWN`).
 - `description` (plain text) is the HTML with tags removed, so tables and headings run together. Do not show it. Use `description_html` and parse it (below).
-- Size chart: 2,178 of the 2,242 kept products have one `<table>` inside `description_html` (first header `Size`, then columns such as Bust, Waist, Hip, Length; values in inches). Columns differ per product.
+- Size chart: 2,178 of the 2,242 kept products have one `<table>` inside `description_html`. In 2,174 of them the first header is `Size` (then columns such as Bust, Waist, Hip, Length; values in inches), and those become `size_chart`. The other 4 tables are not size charts (3 are model measurements, 1 is a bikini-set table), so they are ignored. Columns differ per product.
 - Ratings: `reviews: { rating, count }` aggregate only, no review texts. Some products have `rating: null`.
 - Images: 1 to 8 per product, hosted on Shopify's CDN (not in the repo). Each has `url`, `alt`, `width`, `height`.
 

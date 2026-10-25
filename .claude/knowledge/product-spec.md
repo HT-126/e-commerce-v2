@@ -11,7 +11,7 @@
 Each feature depends only on the ones above it.
 
 1. **Foundation and data**: Docker MySQL, Knex migrations, dataset import seed, demo customer and admin.
-   - Done when: `npm run db:reset` gives 8 categories, 2,242 products (2,178 with a size chart) and 17,022 variants, plus the demo customer, the admin and one delivered demo order.
+   - Done when: `npm run db:reset` gives 8 categories, 2,242 products (2,174 with a size chart) and 17,022 variants, plus the demo customer, the admin and one delivered demo order.
 2. **Catalog**: Home, shop, category and product pages.
    - Home: hero, promises, tabs (New arrivals, Top rated, Under $45), product grid.
    - Shop and category pages: grid with sort, price filter, title search, pages.
