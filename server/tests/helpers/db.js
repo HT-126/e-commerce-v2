@@ -1,3 +1,5 @@
+import bcrypt from 'bcrypt';
+import request from 'supertest';
 import { db } from '../../src/db/knex.js';
 import { colorGroupFor } from '../../src/utils/color-groups.js';
 
@@ -75,4 +77,34 @@ export async function createProduct({
     );
   }
   return { id, slug: slug ?? `product-${n}`, categoryId };
+}
+
+// A user in the database. The password is hashed with a low cost: tests make many users, and the
+// strength of the hash is not what they check.
+export async function createUser({
+  firstName = 'Test',
+  lastName = 'User',
+  email,
+  password = 'password123',
+  role = 'customer',
+} = {}) {
+  const address = (email ?? `user${next()}@example.com`).toLowerCase();
+  const [id] = await db('users').insert({
+    first_name: firstName,
+    last_name: lastName,
+    email: address,
+    password_hash: await bcrypt.hash(password, 4),
+    role,
+  });
+  return { id, email: address, password, role };
+}
+
+// A Supertest agent that keeps the session cookie: it is signed in as this user.
+export async function login(app, user, { remember = false } = {}) {
+  const agent = request.agent(app);
+  const res = await agent
+    .post('/api/auth/login')
+    .send({ email: user.email, password: user.password, remember });
+  if (res.status !== 200) throw new Error(`login helper failed: ${res.status} ${res.text}`);
+  return agent;
 }

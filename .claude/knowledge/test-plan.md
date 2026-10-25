@@ -22,7 +22,8 @@ Priority: **must** = money, stock, permissions or data loss (never skip); **shou
 ## 3. Accounts
 - API (must): register (email lower case, duplicate → `409 EMAIL_TAKEN`), login wrong email and wrong password give the same `401`, password hash never returned, `remember` changes cookie length.
 - API (must): rate limits as in `business-rules.md`: 11th failed sign in per IP → `429 RATE_LIMITED`; successful sign ins do not count; 11 failed tries on one email from different IPs (`X-Forwarded-For` with `TRUST_PROXY=1` in the test) → `429`; 11th register in an hour → `429`.
-- Component (should): register form errors.
+- API (must): the session cookie is `HttpOnly`, `SameSite=Lax`, 30 days with `remember` and 1 day without; a tampered or expired token, or a deleted user, gives `401`; the role is read from the database (a user promoted after sign-in is admin at once); a password over 72 bytes, or `acceptTerms: false`, gives `400`; the duplicate-email check ignores case; the limiters are created fresh per app, so tests never leak `429`s into each other.
+- Component (should): register form errors under each field; the server errors (wrong credentials, email taken, too many attempts) show in place; Show/Hide password; after sign-in the user goes back to the page they came from; the header Account link or menu (name, Admin link for admins only, Sign out). A failed sign out (server error or no network) keeps the user signed in, keeps the panel open and says so; a 401 on sign out counts as signed out. A "next page" that points to another site (`//host`, `/\\host`, tab or line break tricks) is ignored.
 
 ## 4. Cart
 - Unit (must): line status (`ok`, `not_enough`, `sold_out`), totals count only `ok` lines, shipping (`>= 9700` free, else `695`), quantity cap 9.

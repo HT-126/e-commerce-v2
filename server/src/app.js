@@ -2,24 +2,28 @@ import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
+import { createAuthRoutes } from './routes/auth.routes.js';
 import categoriesRoutes from './routes/categories.routes.js';
 import filtersRoutes from './routes/filters.routes.js';
 import healthRoutes from './routes/health.routes.js';
 import productsRoutes from './routes/products.routes.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
+import { createRateLimiters } from './middleware/rate-limit.js';
 
-// Builds the app without listening, so tests can use it with Supertest.
-export function createApp() {
+// Builds the app without listening, so tests can use it with Supertest. Every app gets its own rate limiters.
+// `trustProxy`: the number of proxies in front of the API (null: none). Tests set it to send X-Forwarded-For.
+export function createApp({ trustProxy = env.TRUST_PROXY } = {}) {
   const app = express();
 
   // Only behind a real proxy. Trusting X-Forwarded-For without one lets anyone fake their IP.
-  if (env.TRUST_PROXY !== null) app.set('trust proxy', env.TRUST_PROXY);
+  if (trustProxy !== null) app.set('trust proxy', trustProxy);
 
   app.use(helmet());
   app.use(express.json());
   app.use(cookieParser());
 
   app.use('/api/health', healthRoutes);
+  app.use('/api/auth', createAuthRoutes(createRateLimiters()));
   app.use('/api/categories', categoriesRoutes);
   app.use('/api/filters', filtersRoutes);
   app.use('/api/products', productsRoutes);

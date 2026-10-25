@@ -5,6 +5,7 @@ import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import Layout from './components/Layout.jsx';
 import HomePage from './pages/home/HomePage.jsx';
+import AuthLayout from './pages/auth/AuthLayout.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import ProductPage from './pages/product/ProductPage.jsx';
 import ShopPage from './pages/shop/ShopPage.jsx';
@@ -21,6 +22,23 @@ const router = createBrowserRouter([
       { path: '/shop/:category', element: <ShopPage /> },
       { path: '/products/:slug', element: <ProductPage /> },
       { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+  // Sign in and register have their own slim layout (no shop menu, no footer). Their code (the form
+  // libraries) loads only when one of these pages is opened, so the shop stays light.
+  {
+    element: <AuthLayout />,
+    // Shown while the page's code loads on a first visit: just the page color, so nothing flashes.
+    HydrateFallback: () => <div className="min-h-screen bg-page" />,
+    children: [
+      {
+        path: '/login',
+        lazy: async () => ({ Component: (await import('./pages/auth/LoginPage.jsx')).default }),
+      },
+      {
+        path: '/register',
+        lazy: async () => ({ Component: (await import('./pages/auth/RegisterPage.jsx')).default }),
+      },
     ],
   },
 ]);

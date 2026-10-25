@@ -1,43 +1,52 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, useNavigate, useSearchParams } from 'react-router';
+import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useLogout, useMe } from '../hooks/use-auth.js';
 import { useCategories } from '../hooks/use-catalog.js';
-import { CloseIcon, MenuIcon, SearchIcon } from './icons.jsx';
+import { CloseIcon, MenuIcon, SearchIcon, UserIcon } from './icons.jsx';
 
 const baseLink = 'rounded-full px-1 py-2 text-sm hover:text-highlight';
 const categoryLink = ({ isActive }) =>
   `${baseLink} ${isActive ? 'font-medium underline underline-offset-8' : ''}`;
+const iconButton = 'flex size-11 items-center justify-center rounded-full hover:bg-panel';
 
-// Account and Bag icons come with the Accounts and Cart features, so there are no dead links yet.
+// Only one panel is open at a time: 'menu' (phone), 'search' or 'account'.
+// The Bag icon comes with the Cart feature, so there is no dead link yet.
 export default function Header() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [panel, setPanel] = useState(null);
   const headerRef = useRef(null);
   const searchButtonRef = useRef(null);
   const menuButtonRef = useRef(null);
+  const accountButtonRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { data: categories = [] } = useCategories();
+  const { data: user, isPending: userLoading } = useMe();
+  const logout = useLogout();
+
+  const [signOutFailed, setSignOutFailed] = useState(false);
+
   const close = () => {
-    setMenuOpen(false);
-    setSearchOpen(false);
+    setPanel(null);
+    setSignOutFailed(false);
+  };
+  const toggle = (name) => {
+    setSignOutFailed(false);
+    setPanel((current) => (current === name ? null : name));
   };
 
   // An open panel closes on Escape (focus goes back to its button), a click outside, or Tab leaving the header.
-  const panelOpen = menuOpen || searchOpen;
   useEffect(() => {
-    if (!panelOpen) return undefined;
+    if (!panel) return undefined;
 
-    const closeAll = () => {
-      setMenuOpen(false);
-      setSearchOpen(false);
-    };
     const closeIfOutside = (event) => {
-      if (!headerRef.current?.contains(event.target)) closeAll();
+      if (!headerRef.current?.contains(event.target)) setPanel(null);
     };
     const closeOnEscape = (event) => {
       if (event.key !== 'Escape') return;
-      (searchOpen ? searchButtonRef : menuButtonRef).current?.focus();
-      closeAll();
+      const buttons = { search: searchButtonRef, menu: menuButtonRef, account: accountButtonRef };
+      buttons[panel].current?.focus();
+      setPanel(null);
     };
     document.addEventListener('pointerdown', closeIfOutside);
     document.addEventListener('focusin', closeIfOutside);
@@ -47,24 +56,25 @@ export default function Header() {
       document.removeEventListener('focusin', closeIfOutside);
       document.removeEventListener('keydown', closeOnEscape);
     };
-  }, [panelOpen, searchOpen]);
-
-  function toggleMenu() {
-    setSearchOpen(false);
-    setMenuOpen((open) => !open);
-  }
-
-  function toggleSearch() {
-    setMenuOpen(false);
-    setSearchOpen((open) => !open);
-  }
+  }, [panel]);
 
   // An empty search shows all products again.
   function submitSearch(event) {
     event.preventDefault();
     const text = new FormData(event.currentTarget).get('q').trim();
-    setSearchOpen(false);
+    close();
     navigate(text ? `/shop?${new URLSearchParams({ q: text })}` : '/shop');
+  }
+
+  // If signing out fails the user is still signed in, so the panel stays open and says so.
+  async function signOut() {
+    setSignOutFailed(false);
+    try {
+      await logout.mutateAsync();
+      close();
+    } catch {
+      setSignOutFailed(true);
+    }
   }
 
   const links = [
@@ -77,12 +87,18 @@ export default function Header() {
         {c.name}
       </NavLink>
     )),
+    // The Admin pages come with the Admin feature. Until then this link shows the "Page not found" page.
+    user?.role === 'admin' && (
+      <NavLink key="admin" to="/admin" className={categoryLink} onClick={close}>
+        Admin
+      </NavLink>
+    ),
   ];
 
   return (
     <header ref={headerRef} className="mx-auto w-full max-w-7xl px-6 pt-4">
       <div className="flex items-center justify-between gap-4 rounded-full bg-white px-5 py-2 shadow-sm">
-        <Link to="/" className="font-serif text-2xl" onClick={close}>
+        <Link to="/" className="inline-flex min-h-11 items-center font-serif text-2xl" onClick={close}>
           Lumière
         </Link>
 
@@ -95,28 +111,57 @@ export default function Header() {
             ref={searchButtonRef}
             type="button"
             aria-label="Search"
-            aria-expanded={searchOpen}
-            aria-controls={searchOpen ? 'header-search' : undefined}
-            onClick={toggleSearch}
-            className="flex size-11 items-center justify-center rounded-full hover:bg-panel"
+            aria-expanded={panel === 'search'}
+            aria-controls={panel === 'search' ? 'header-search' : undefined}
+            onClick={() => toggle('search')}
+            className={iconButton}
           >
             <SearchIcon />
           </button>
+
+          {userLoading ? (
+            // Keeps the space while we find out who is signed in, so nothing jumps.
+            <span className="size-11" aria-hidden="true" />
+          ) : user ? (
+            <button
+              ref={accountButtonRef}
+              type="button"
+              aria-label="Account"
+              aria-expanded={panel === 'account'}
+              aria-controls={panel === 'account' ? 'account-menu' : undefined}
+              onClick={() => toggle('account')}
+              className={iconButton}
+            >
+              <UserIcon />
+            </button>
+          ) : (
+            // After signing in the visitor comes back to this page.
+            <Link
+              to="/login"
+              state={{ from: location.pathname + location.search }}
+              aria-label="Sign in"
+              onClick={close}
+              className={iconButton}
+            >
+              <UserIcon />
+            </Link>
+          )}
+
           <button
             ref={menuButtonRef}
             type="button"
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={menuOpen}
-            aria-controls={menuOpen ? 'mobile-menu' : undefined}
-            onClick={toggleMenu}
-            className="flex size-11 items-center justify-center rounded-full hover:bg-panel xl:hidden"
+            aria-label={panel === 'menu' ? 'Close menu' : 'Open menu'}
+            aria-expanded={panel === 'menu'}
+            aria-controls={panel === 'menu' ? 'mobile-menu' : undefined}
+            onClick={() => toggle('menu')}
+            className={`${iconButton} xl:hidden`}
           >
-            {menuOpen ? <CloseIcon /> : <MenuIcon />}
+            {panel === 'menu' ? <CloseIcon /> : <MenuIcon />}
           </button>
         </div>
       </div>
 
-      {searchOpen && (
+      {panel === 'search' && (
         <form
           id="header-search"
           role="search"
@@ -137,7 +182,31 @@ export default function Header() {
         </form>
       )}
 
-      {menuOpen && (
+      {panel === 'account' && user && (
+        <div id="account-menu" className="mt-2 ml-auto max-w-xs rounded-[28px] bg-white px-6 py-4 shadow-sm">
+          <p className="font-serif text-xl">
+            {user.firstName} {user.lastName}
+          </p>
+          <p className="break-all text-sm text-ink-soft">{user.email}</p>
+          <div className="mt-3 border-t border-border pt-2">
+            <button
+              type="button"
+              onClick={signOut}
+              disabled={logout.isPending}
+              className="min-h-11 w-full text-left text-sm hover:text-highlight disabled:opacity-50"
+            >
+              Sign out
+            </button>
+            {signOutFailed && (
+              <p role="alert" className="pb-2 text-sm text-error">
+                Could not sign out. Please try again.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {panel === 'menu' && (
         <nav
           id="mobile-menu"
           aria-label="Main"

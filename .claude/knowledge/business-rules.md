@@ -74,10 +74,11 @@ Merge when the user signs in or registers:
 
 ## Accounts
 - Email is unique, not case sensitive (store lower case).
-- Password: at least 8 characters.
+- Password: 8 to 72 bytes (bcrypt reads only the first 72, so a longer password is rejected instead of silently cut).
 - The terms checkbox must be ticked to register.
 - "Keep me signed in": cookie lasts 30 days. Without it: 1 day.
-- Wrong email and wrong password give the same message.
+- Wrong email and wrong password give the same message, and take the same time (an unknown email still runs a password compare), so nobody can find out which emails have an account.
+- Who is signed in is checked against the database on every request. The role comes from the database, never from the cookie.
 - Rate limits (per server process, memory store):
   - Sign in, per IP: 10 **failed** tries per 15 minutes. A successful sign in does not count.
   - Sign in, per email: 10 failed tries per 15 minutes for the same email (trimmed, lower case), from any IP.

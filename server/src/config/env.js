@@ -22,6 +22,26 @@ export function requireVars(names) {
 
 requireVars(required);
 
+// Wrong values, not only missing ones. Pure, so a test can try it with plain objects.
+export function envProblems(vars) {
+  const problems = [];
+  if (vars.TRUST_PROXY && !/^\d+$/.test(vars.TRUST_PROXY)) {
+    problems.push(
+      'TRUST_PROXY must be a whole number (how many proxies are in front of the API), for example 1',
+    );
+  }
+  if (vars.NODE_ENV === 'production' && (vars.JWT_SECRET ?? '').length < 32) {
+    problems.push('JWT_SECRET must be at least 32 characters in production');
+  }
+  return problems;
+}
+
+const problems = envProblems(process.env);
+if (problems.length > 0) {
+  console.error(`Wrong environment values:\n- ${problems.join('\n- ')}`);
+  process.exit(1);
+}
+
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: Number(process.env.PORT),

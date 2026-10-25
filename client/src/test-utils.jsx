@@ -4,30 +4,46 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { vi } from 'vitest';
 
 // Renders a page at a URL, with a fresh query cache that never retries.
-export function renderRoute(element, { path = '/', url = '/' } = {}) {
+// `extraRoutes`: more <Route> elements, for example a page to land on after a redirect.
+export function renderRoute(element, { path = '/', url = '/', extraRoutes = null } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[url]}>
         <Routes>
           <Route path={path} element={element} />
+          {extraRoutes}
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-// Replaces fetch. `handler(url)` returns `{ status?, body }` for each request.
+// Replaces fetch. `handler(url, init)` returns `{ status?, body }` for each request (`init` has the method and body).
 export function stubApi(handler) {
-  const fetchMock = vi.fn((url) => {
-    const { status = 200, body } = handler(url);
-    return Promise.resolve(new Response(JSON.stringify(body), { status }));
+  const fetchMock = vi.fn((url, init) => {
+    const { status = 200, body } = handler(url, init);
+    // 204 has no body
+    return Promise.resolve(new Response(status === 204 ? null : JSON.stringify(body), { status }));
   });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
 
 export const calledUrls = (fetchMock) => fetchMock.mock.calls.map(([url]) => url);
+
+// The JSON bodies sent to one URL, newest last.
+export const bodiesSentTo = (fetchMock, url) =>
+  fetchMock.mock.calls.filter(([called]) => called === url).map(([, init]) => JSON.parse(init.body));
+
+export const aUser = (overrides = {}) => ({
+  id: 1,
+  firstName: 'Anna',
+  lastName: 'Kim',
+  email: 'anna@example.com',
+  role: 'customer',
+  ...overrides,
+});
 
 export const productCard = (overrides = {}) => ({
   id: 1,
