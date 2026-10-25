@@ -40,8 +40,9 @@ describe('ProductGrid', () => {
     });
 
     expect(screen.getByRole('link', { name: /Blue Dress/ })).toHaveAttribute('href', '/products/blue-dress');
-    expect(screen.getByText('$44.99 · 4.8 ★ (7)')).toBeInTheDocument();
-    expect(screen.getByText('$44.99', { exact: true })).toBeInTheDocument();
+    expect(screen.getAllByText('$44.99')).toHaveLength(2);
+    expect(screen.getByText('4.8 (7)')).toBeInTheDocument();
+    expect(screen.getByText('Rated 4.8 out of 5 from 7 reviews')).toBeInTheDocument();
   });
 
   it('shows an action under the empty message when one is given', () => {

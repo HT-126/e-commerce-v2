@@ -17,7 +17,7 @@ export default function ProductGrid({
     return (
       <div className={gridClass} role="status" aria-label="Loading products">
         {Array.from({ length: skeletonCount }, (_, i) => (
-          <div key={i} className="aspect-[3/4.6] animate-pulse rounded-[28px] bg-card" />
+          <div key={i} className="aspect-[3/5] animate-pulse rounded-[28px] bg-card" />
         ))}
       </div>
     );
