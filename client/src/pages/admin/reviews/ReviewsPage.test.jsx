@@ -1,10 +1,15 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { toast } from 'sonner';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Toaster } from '@/components/ui/sonner';
 import { calledUrls, renderRoute, stubApi } from '../../../test-utils.jsx';
 import ReviewsPage from './ReviewsPage.jsx';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  // Toasts live in one shared store, so one test's toast would still be on screen in the next.
+  toast.dismiss();
+});
 
 const failure = { status: 500, body: { error: { message: 'Something went wrong' } } };
 

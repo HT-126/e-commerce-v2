@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createBrowserRouter } from 'react-router';
+import { Navigate, createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import CartSync from './components/CartSync.jsx';
 import Layout from './components/Layout.jsx';
@@ -42,6 +42,10 @@ const router = createBrowserRouter([
     ...lazyPage(() => import('./pages/admin/AdminRoot.jsx')),
     HydrateFallback: () => <div className="min-h-screen bg-page" />,
     children: [
+      { index: true, element: <Navigate to="/admin/products" replace /> },
+      { path: 'products', ...lazyPage(() => import('./pages/admin/products/ProductsPage.jsx')) },
+      { path: 'products/new', ...lazyPage(() => import('./pages/admin/products/ProductEditPage.jsx')) },
+      { path: 'products/:id', ...lazyPage(() => import('./pages/admin/products/ProductEditPage.jsx')) },
       { path: 'orders', ...lazyPage(() => import('./pages/admin/orders/OrdersPage.jsx')) },
       { path: 'orders/:orderNumber', ...lazyPage(() => import('./pages/admin/orders/OrderDetailPage.jsx')) },
       { path: 'reviews', ...lazyPage(() => import('./pages/admin/reviews/ReviewsPage.jsx')) },
