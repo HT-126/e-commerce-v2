@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api.js';
+import { CART_KEY } from '../lib/cart.js';
 import { getMe, login, logout, register } from '../services/auth.js';
+import { useCartStore } from '../stores/cart-store.js';
 
 const ME = ['me'];
 
@@ -20,15 +22,22 @@ export function useRegister() {
   return useMutation({ mutationFn: register, onSuccess: (user) => queryClient.setQueryData(ME, user) });
 }
 
+// Signing out empties the bag in the browser. The account bag stays on the server.
+function signedOut(queryClient) {
+  queryClient.setQueryData(ME, null);
+  useCartStore.getState().clear();
+  queryClient.removeQueries({ queryKey: CART_KEY });
+}
+
 // Signed out when the server says so, or when the session was already over (a 401). Any other failure
 // (a server error, no network) leaves the cookie in place, so the user stays signed in and can try again.
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: logout,
-    onSuccess: () => queryClient.setQueryData(ME, null),
+    onSuccess: () => signedOut(queryClient),
     onError: (error) => {
-      if (error instanceof ApiError && error.status === 401) queryClient.setQueryData(ME, null);
+      if (error instanceof ApiError && error.status === 401) signedOut(queryClient);
     },
   });
 }

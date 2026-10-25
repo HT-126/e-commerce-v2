@@ -1,10 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { aUser, stubApi } from '../test-utils.jsx';
+import { useCartStore } from '../stores/cart-store.js';
+import { aCart, aUser, stubApi } from '../test-utils.jsx';
 import { useLogout, useMe } from './use-auth.js';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+  useCartStore.setState({ items: [] });
+});
 
 // Same cache options as the app for the 'me' query (no retries), so a test sees what a visitor would.
 function setup() {
@@ -82,5 +87,48 @@ describe('useLogout', () => {
     await act(() => logout.result.current.mutateAsync().catch(() => {}));
 
     expect(queryClient.getQueryData(['me'])).toEqual(aUser());
+  });
+
+  describe('the bag', () => {
+    // A guest bag that could not be merged yet, and the signed-in user's bag in the cache.
+    const withBags = (queryClient) => {
+      useCartStore.setState({ items: [{ variantId: 1, quantity: 2 }] });
+      queryClient.setQueryData(['cart'], aCart());
+      queryClient.setQueryData(['cart', 'quote', []], aCart());
+    };
+
+    it('is emptied in the browser after a successful sign out', async () => {
+      const { queryClient, logout } = await signedIn({ status: 204 });
+      withBags(queryClient);
+
+      await act(() => logout.result.current.mutateAsync());
+
+      expect(useCartStore.getState().items).toEqual([]);
+      expect(queryClient.getQueryData(['cart'])).toBeUndefined();
+      expect(queryClient.getQueryData(['cart', 'quote', []])).toBeUndefined();
+    });
+
+    it('is emptied too when the session was already over (401)', async () => {
+      const { queryClient, logout } = await signedIn({
+        status: 401,
+        body: { error: { code: 'UNAUTHORIZED', message: 'x' } },
+      });
+      withBags(queryClient);
+
+      await act(() => logout.result.current.mutateAsync().catch(() => {}));
+
+      expect(useCartStore.getState().items).toEqual([]);
+      expect(queryClient.getQueryData(['cart'])).toBeUndefined();
+    });
+
+    it('is kept when signing out fails, because the user is still signed in', async () => {
+      const { queryClient, logout } = await signedIn({ status: 500, body: { error: { message: 'x' } } });
+      withBags(queryClient);
+
+      await act(() => logout.result.current.mutateAsync().catch(() => {}));
+
+      expect(useCartStore.getState().items).toEqual([{ variantId: 1, quantity: 2 }]);
+      expect(queryClient.getQueryData(['cart'])).toEqual(aCart());
+    });
   });
 });
