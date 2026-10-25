@@ -24,6 +24,12 @@ export const SearchIcon = (props) => (
   </Icon>
 );
 
+export const BagIcon = (props) => (
+  <Icon {...props}>
+    <path d="M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2" />
+  </Icon>
+);
+
 export const MenuIcon = (props) => (
   <Icon {...props}>
     <path d="M4 7h16M4 12h16M4 17h16" />

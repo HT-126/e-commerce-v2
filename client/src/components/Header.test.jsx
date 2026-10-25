@@ -2,10 +2,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { aUser, stubApi } from '../test-utils.jsx';
+import { useCartStore } from '../stores/cart-store.js';
+import { aCart, aCartLine, aUser, calledUrls, stubApi } from '../test-utils.jsx';
 import Header from './Header.jsx';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+  useCartStore.setState({ items: [] });
+});
 
 function Where() {
   const { pathname, search, state } = useLocation();
@@ -18,12 +23,14 @@ const categories = [
 ];
 const guest = { status: 401, body: { error: { message: 'Please sign in', code: 'UNAUTHORIZED' } } };
 
-// `user`: who is signed in (null: a guest). `onLogout`: what the sign out request answers.
-function renderHeader(url = '/', { user = null, logout = { status: 204 } } = {}) {
+// `user`: who is signed in (null: a guest). `logout`: what the sign out request answers.
+// `cartLines`: the lines of the signed-in user's bag.
+function renderHeader(url = '/', { user = null, logout = { status: 204 }, cartLines = [] } = {}) {
   const fetchMock = stubApi((requested) => {
     if (requested === '/api/categories') return { body: { data: categories } };
     if (requested === '/api/auth/me') return user ? { body: { data: { user } } } : guest;
     if (requested === '/api/auth/logout') return logout;
+    if (requested === '/api/cart') return { body: { data: aCart(cartLines) } };
     return { body: { data: [] } };
   });
   render(
@@ -349,5 +356,60 @@ describe('Header', () => {
       expect(screen.getByText('anna@example.com')).toBeInTheDocument();
       expect(screen.getAllByRole('navigation', { name: 'Main' })).toHaveLength(1);
     });
+  });
+});
+
+describe('Header Bag', () => {
+  const guestItems = (...quantities) =>
+    useCartStore.setState({ items: quantities.map((quantity, i) => ({ variantId: i + 1, quantity })) });
+
+  it('links to the cart, with no number when the bag is empty', async () => {
+    renderHeader();
+
+    const bag = await screen.findByRole('link', { name: 'Bag' });
+
+    expect(bag).toHaveAttribute('href', '/cart');
+    expect(bag).toHaveTextContent('');
+  });
+
+  it('shows the number of items a guest has in the bag, without asking the server', async () => {
+    guestItems(2, 3);
+    const fetchMock = renderHeader();
+
+    const bag = await screen.findByRole('link', { name: 'Bag, 5 items' });
+
+    expect(bag).toHaveTextContent('5');
+    expect(calledUrls(fetchMock)).not.toContain('/api/cart');
+  });
+
+  it('says "1 item" for one item', async () => {
+    guestItems(1);
+    renderHeader();
+
+    expect(await screen.findByRole('link', { name: 'Bag, 1 item' })).toBeInTheDocument();
+  });
+
+  it("shows the number of items in a signed-in user's bag, from the server", async () => {
+    renderHeader('/', {
+      user: aUser(),
+      cartLines: [aCartLine({ variantId: 1, quantity: 2 }), aCartLine({ variantId: 2, quantity: 1 })],
+    });
+
+    expect(await screen.findByRole('link', { name: 'Bag, 3 items' })).toBeInTheDocument();
+  });
+
+  it('shows no number while it is still finding out who is signed in', async () => {
+    guestItems(4);
+    renderHeader();
+
+    expect(screen.getByRole('link', { name: 'Bag' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Bag, 4 items' })).toBeInTheDocument();
+  });
+
+  it('shows 99+ for a very full bag', async () => {
+    guestItems(...Array(12).fill(9));
+    renderHeader();
+
+    expect(await screen.findByRole('link', { name: 'Bag, 108 items' })).toHaveTextContent('99+');
   });
 });
