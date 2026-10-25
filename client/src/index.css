@@ -1,0 +1,71 @@
+@import 'tailwindcss';
+
+/* Tokens from .claude/rules/ui-design.md. shadcn/ui variables are set now so admin pages match later. */
+:root {
+  --radius: 1rem;
+  --background: #f3f0e8;
+  --foreground: #23261f;
+  --card: #e9e6db;
+  --card-foreground: #23261f;
+  --popover: #f3f0e8;
+  --popover-foreground: #23261f;
+  --primary: #34412f;
+  --primary-foreground: #f3f0e8;
+  --secondary: #e4e1d3;
+  --secondary-foreground: #23261f;
+  --muted: #e4e1d3;
+  --muted-foreground: #4a5143;
+  --accent: #e4e1d3;
+  --accent-foreground: #23261f;
+  --destructive: #9a3b2e;
+  --border: #d3cfc1;
+  --input: #d3cfc1;
+  --ring: #34412f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Lumière-only tokens */
+@theme {
+  --color-page: #f3f0e8;
+  --color-ink: #23261f;
+  --color-ink-soft: #4a5143;
+  --color-on-primary: #f3f0e8;
+  --color-panel: #e4e1d3;
+  --color-accent-light: #b9c4aa;
+  --color-highlight: #7f8672;
+  --color-footer: #1f271c;
+  --color-error: #9a3b2e;
+
+  --font-serif: 'Newsreader', serif;
+  --font-sans: 'Instrument Sans', sans-serif;
+}
+
+body {
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}

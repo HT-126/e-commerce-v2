@@ -1,0 +1,5 @@
+node_modules
+dist
+coverage
+server/db/data
+package-lock.json

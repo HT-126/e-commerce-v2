@@ -1,0 +1,13 @@
+# Add these lines to your project's .gitignore
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.*
+!.env.example
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Source dataset (about 30 MB). Download it with `npm run data:download` in server/
+server/db/data/products.json

@@ -1,0 +1,56 @@
+{
+  "info": {
+    "_postman_id": "9c8f2f66-756d-42e9-a033-1527f6d338e8",
+    "name": "Lumière API",
+    "description": "API checks. See postman/README.md. Run each folder from top to bottom.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Foundation",
+      "item": [
+        {
+          "name": "Health check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Server and database are up. Expect data.status = ok and data.db = ok."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "demoEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "demoPassword",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

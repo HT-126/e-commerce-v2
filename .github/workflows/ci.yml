@@ -1,0 +1,73 @@
+# GitHub Actions CI: lint, test and build on every push and pull request.
+# The setup-project skill copies this file to .github/workflows/ci.yml after the foundation works.
+# Every value below is a dummy for CI only. Never put real secrets here.
+# Add any extra variable that the server checks at startup (see server/.env.example).
+# Tests never need the dataset file: test data is inserted by each test.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: ecommerce_v2_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      NODE_ENV: test
+      PORT: 3001
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: ecommerce_v2_test
+      DB_NAME_TEST: ecommerce_v2_test
+      JWT_SECRET: ci-only-secret
+      DEMO_CUSTOMER_EMAIL: demo@example.com
+      DEMO_CUSTOMER_PASSWORD: demo-password
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: admin-password
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  client:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
