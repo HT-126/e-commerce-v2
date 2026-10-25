@@ -1,5 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderRoute, stubApi } from '../../test-utils.jsx';
 import ProductPage from './ProductPage.jsx';
 
@@ -39,10 +39,14 @@ const baseProduct = {
   ],
 };
 
+// A fake API for the page: the product, its related products, and the reviews (a guest, with none).
 function renderProduct(overrides = {}) {
-  stubApi((url) =>
-    url.endsWith('/related') ? { body: { data: [] } } : { body: { data: { ...baseProduct, ...overrides } } },
-  );
+  stubApi((url) => {
+    if (url === '/api/auth/me') return { status: 401, body: { error: { message: 'Please sign in', code: 'UNAUTHORIZED' } } };
+    if (url.includes('/reviews?')) return { body: { data: { items: [], page: 1, limit: 10, total: 0 } } };
+    if (url.endsWith('/related')) return { body: { data: [] } };
+    return { body: { data: { ...baseProduct, ...overrides } } };
+  });
   renderRoute(<ProductPage />, { path: '/products/:slug', url: '/products/midi-dress' });
 }
 
@@ -143,6 +147,72 @@ describe('ProductPage', () => {
     renderProduct({ ratingAvg: null, reviewCount: 0 });
 
     expect(await screen.findByText('No reviews yet.')).toBeInTheDocument();
+  });
+
+  it('shows the new rating after the buyer saves a review', async () => {
+    let product = { ...baseProduct, ratingAvg: 4.7, reviewCount: 7 };
+    let mine = null;
+    stubApi((url, init) => {
+      if (url === '/api/auth/me') {
+        return { body: { data: { user: { id: 1, firstName: 'Anna', lastName: 'Kim', email: 'a@example.com', role: 'customer' } } } };
+      }
+      if (url.includes('/reviews?')) return { body: { data: { items: [], page: 1, limit: 10, total: 0 } } };
+      if (url.endsWith('/reviews/mine')) {
+        if (init.method === 'PUT') {
+          mine = { ...JSON.parse(init.body), createdAt: '2026-10-25T12:00:00.000Z' };
+          // The server recomputes the shown rating: now 8 reviews.
+          product = { ...product, ratingAvg: 4.8, reviewCount: 8 };
+          return { body: { data: { review: mine, ratingAvg: 4.8, reviewCount: 8 } } };
+        }
+        return { body: { data: { review: mine, canReview: true } } };
+      }
+      if (url.endsWith('/related')) return { body: { data: [] } };
+      return { body: { data: product } };
+    });
+    renderRoute(<ProductPage />, { path: '/products/:slug', url: '/products/midi-dress' });
+    expect(await screen.findByText(/Average from 7 reviews/)).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Write a review' }));
+    fireEvent.click(screen.getByRole('radio', { name: '5 stars' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save review' }));
+
+    expect(await screen.findByText(/Average from 8 reviews/)).toBeInTheDocument();
+    expect(screen.getByText('4.8 · 8 reviews')).toBeInTheDocument();
+  });
+
+  describe('the #reviews link from an order', () => {
+    const scrollIntoView = vi.fn();
+
+    beforeEach(() => {
+      scrollIntoView.mockClear();
+      Element.prototype.scrollIntoView = scrollIntoView;
+    });
+
+    function openAt(url) {
+      stubApi((requested) => {
+        if (requested === '/api/auth/me') return { status: 401, body: { error: { message: 'x', code: 'UNAUTHORIZED' } } };
+        if (requested.includes('/reviews?')) return { body: { data: { items: [], page: 1, limit: 10, total: 0 } } };
+        if (requested.endsWith('/related')) return { body: { data: [] } };
+        return { body: { data: baseProduct } };
+      });
+      renderRoute(<ProductPage />, { path: '/products/:slug', url });
+    }
+
+    it('scrolls to the reviews once the product has loaded, and only once', async () => {
+      openAt('/products/midi-dress#reviews');
+      await screen.findByRole('heading', { level: 1, name: 'Midi Dress' });
+
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+      expect(document.getElementById('reviews')).toBeInTheDocument();
+      expect(scrollIntoView.mock.contexts[0]).toBe(document.getElementById('reviews'));
+    });
+
+    it('does not scroll without the link', async () => {
+      openAt('/products/midi-dress');
+      await screen.findByRole('heading', { level: 1, name: 'Midi Dress' });
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
   });
 
   it('shows the not found page for an unknown product', async () => {

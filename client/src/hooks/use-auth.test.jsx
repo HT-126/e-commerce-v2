@@ -97,6 +97,7 @@ describe('useLogout', () => {
       queryClient.setQueryData(['cart', 'quote', []], aCart());
       queryClient.setQueryData(['orders', { page: 1, limit: 10 }], { items: [], total: 0 });
       queryClient.setQueryData(['order', 'LM-261025-4821'], anOrder());
+      queryClient.setQueryData(['myReview', 'midi-dress'], { review: null, canReview: true });
     };
 
     it('is emptied in the browser after a successful sign out', async () => {
@@ -118,6 +119,7 @@ describe('useLogout', () => {
 
       expect(queryClient.getQueryData(['orders', { page: 1, limit: 10 }])).toBeUndefined();
       expect(queryClient.getQueryData(['order', 'LM-261025-4821'])).toBeUndefined();
+      expect(queryClient.getQueryData(['myReview', 'midi-dress'])).toBeUndefined();
     });
 
     it('is emptied too when the session was already over (401)', async () => {
@@ -166,12 +168,14 @@ describe('signing in', () => {
     const { queryClient, wrapper } = setup();
     queryClient.setQueryData(['orders', { page: 1, limit: 10 }], { items: [{}], total: 1 });
     queryClient.setQueryData(['order', 'LM-261025-4821'], anOrder());
+    queryClient.setQueryData(['myReview', 'midi-dress'], { review: null, canReview: true });
     const { result } = renderHook(() => useLogin(), { wrapper });
 
     await act(() => result.current.mutateAsync({ email: 'b@example.com', password: 'password123' }));
 
     expect(queryClient.getQueryData(['orders', { page: 1, limit: 10 }])).toBeUndefined();
     expect(queryClient.getQueryData(['order', 'LM-261025-4821'])).toBeUndefined();
+    expect(queryClient.getQueryData(['myReview', 'midi-dress'])).toBeUndefined();
   });
 
   it('does the same after registering', async () => {

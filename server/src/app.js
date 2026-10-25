@@ -9,6 +9,7 @@ import filtersRoutes from './routes/filters.routes.js';
 import healthRoutes from './routes/health.routes.js';
 import ordersRoutes from './routes/orders.routes.js';
 import productsRoutes from './routes/products.routes.js';
+import reviewsRoutes from './routes/reviews.routes.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { createRateLimiters } from './middleware/rate-limit.js';
 
@@ -30,6 +31,7 @@ export function createApp({ trustProxy = env.TRUST_PROXY } = {}) {
   app.use('/api/categories', categoriesRoutes);
   app.use('/api/filters', filtersRoutes);
   app.use('/api/orders', ordersRoutes);
+  app.use('/api/products/:slug/reviews', reviewsRoutes);
   app.use('/api/products', productsRoutes);
 
   app.use(notFoundHandler);

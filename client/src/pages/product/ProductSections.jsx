@@ -103,7 +103,7 @@ export function SizeChartSection({ sizeChart, className = '' }) {
   );
 }
 
-// Only the rating summary for now. The review list comes with the Reviews feature.
+// The rating summary strip. The list and the form are in `ReviewsSection`.
 export function RatingSection({ ratingAvg, reviewCount }) {
   return (
     <section className="flex flex-col gap-4 rounded-[28px] bg-panel p-8 md:flex-row md:items-center md:gap-10">

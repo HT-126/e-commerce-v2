@@ -163,3 +163,16 @@ export async function createOrder({
   });
   return { id, orderNumber: number };
 }
+
+// A review in the database. It does not change the product's shown rating, so a test that needs the
+// numbers right goes through the API.
+export async function createReview({ user, product, rating = 5, comment = null, createdAt = new Date() } = {}) {
+  const [id] = await db('reviews').insert({
+    product_id: product.id,
+    user_id: user.id,
+    rating,
+    comment,
+    created_at: createdAt,
+  });
+  return { id };
+}

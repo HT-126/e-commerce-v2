@@ -17,7 +17,8 @@ function OrderSkeleton() {
   );
 }
 
-function OrderItem({ item }) {
+// `canReview`: only a delivered order's items can be reviewed. The product page checks it again.
+function OrderItem({ item, canReview }) {
   return (
     <li className="flex gap-4 rounded-[28px] bg-white p-4 sm:gap-6">
       {/* The title is the link for keyboards and screen readers; the photo is a bigger target for the mouse. */}
@@ -40,6 +41,14 @@ function OrderItem({ item }) {
           <p className="mt-1 text-sm">
             {item.quantity} × {formatMoney(item.unitPriceCents)}
           </p>
+          {canReview && (
+            <Link
+              to={`/products/${item.productSlug}#reviews`}
+              className="mt-1 inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
+            >
+              Write a review
+            </Link>
+          )}
         </div>
         <p className="shrink-0 font-medium">{formatMoney(item.lineTotalCents)}</p>
       </div>
@@ -100,7 +109,11 @@ export default function OrderPage() {
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-3">
         <ul className="space-y-4 lg:col-span-2">
           {order.items.map((item) => (
-            <OrderItem key={`${item.productSlug}-${item.color}-${item.size}`} item={item} />
+            <OrderItem
+              key={`${item.productSlug}-${item.color}-${item.size}`}
+              item={item}
+              canReview={order.status === 'delivered'}
+            />
           ))}
         </ul>
 

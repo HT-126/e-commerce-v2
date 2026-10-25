@@ -1,10 +1,12 @@
-import { useParams } from 'react-router';
+import { useEffect, useRef } from 'react';
+import { useLocation, useParams } from 'react-router';
 import Button from '../../components/Button.jsx';
 import ProductGrid from '../../components/ProductGrid.jsx';
 import { useProduct, useRelatedProducts } from '../../hooks/use-catalog.js';
 import NotFoundPage from '../NotFoundPage.jsx';
 import ProductView, { Breadcrumb } from './ProductView.jsx';
 import { AboutSection, DetailsSection, RatingSection, SizeChartSection } from './ProductSections.jsx';
+import ReviewsSection from './ReviewsSection.jsx';
 
 // Column names differ per product ("Bust" or "Sleeve Length (in)"), so judge by the text, not the count.
 // A chart with long headers needs the full width; a short one sits beside the other two panels.
@@ -52,6 +54,17 @@ export default function ProductPage() {
   const { slug } = useParams();
   const { data: product, isPending, isError, error, refetch } = useProduct(slug);
 
+  // The "Write a review" link from an order ends in `#reviews`, but that place only exists once the product
+  // has loaded, so the browser cannot scroll to it by itself. Once per visit: a refetch (after a review is
+  // saved) must not jump the page again.
+  const { hash } = useLocation();
+  const scrolledTo = useRef(null);
+  useEffect(() => {
+    if (!product || hash !== '#reviews' || scrolledTo.current === `${slug}${hash}`) return;
+    scrolledTo.current = `${slug}${hash}`;
+    document.getElementById('reviews')?.scrollIntoView();
+  }, [product, hash, slug]);
+
   if (isPending) return <ProductSkeleton />;
   if (isError && error.status === 404) return <NotFoundPage />;
   if (isError) {
@@ -79,8 +92,10 @@ export default function ProductPage() {
         <SizeChartSection sizeChart={product.sizeChart} className={wideChart ? 'lg:col-span-2' : ''} />
       </div>
 
-      <div className="mt-6">
+      {/* "Write a review" links from the order history land here. */}
+      <div id="reviews" className="mt-6 scroll-mt-6">
         <RatingSection ratingAvg={product.ratingAvg} reviewCount={product.reviewCount} />
+        <ReviewsSection slug={product.slug} />
       </div>
 
       <Related slug={product.slug} />
