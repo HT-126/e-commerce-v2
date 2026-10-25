@@ -24,4 +24,6 @@ Format: `- <decision> (reason: <why>)`. Newest at the bottom. Details live in th
 - Shop filters: Color uses 14 groups (13 base colors and `other`) stored in `variants.color_group`, computed by one function from the dataset color name (reason: 502 raw names are too many to filter on; one column keeps the SQL simple and the index useful).
 - Color and Size filters match in-stock variants only (reason: a shopper who picks size M wants something buyable).
 - Search lives in the header; the Shop page has Color, Size, Price and Sort instead of a search box (reason: owner's choice). "Clear filters" also clears the search text.
-- Header is a full-width sticky white bar, 64px, with a shadow after scrolling (reason: owner's choice; replaces the rounded pill from the design).
+- Header keeps the rounded white pill of the design and is sticky: 64px high, above the content, a small shadow that gets deeper after scrolling (reason: owner's choice; an earlier full-width bar was dropped to keep the design).
+- Home slogans reveal with a left-to-right `clip-path` wipe (1.2s, second one 0.4s later, once, off for reduced motion), not a fade (reason: owner's choice).
+- Shop controls Color, Size, Price and Sort have no box, just text and an arrow (reason: owner's choice).

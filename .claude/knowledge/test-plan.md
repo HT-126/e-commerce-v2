@@ -16,7 +16,7 @@ Priority: **must** = money, stock, permissions or data loss (never skip); **shou
 - Filters, unit (must): `colorGroupFor` (plain, multi-word, `A/B` names, unknown, empty), `sortSizes`, query schema (comma lists, limits, min greater than max).
 - Filters, API (must): `color` alone, several colors, `size` alone, several sizes; color + size must match the **same** in-stock variant; a sold-out variant never matches; price range edges (min included); `minPriceCents` above `maxPriceCents` gives `400`; filters + sort + category + search + paging together; unknown color or size gives an empty list; `GET /api/filters` lists only options of active products, sizes in order, no `stock`.
 - Filters, component (should): picking several colors or sizes updates the URL and the request; a refresh restores the filters; "Clear filters" resets Color, Size, Price and search but keeps category and sort; the empty state offers "Clear filters"; bad values in the URL are ignored.
-- Header (should): sticky bar shows a shadow only after scrolling; the search field opens, submits to `/shop?q=` and closes with Escape.
+- Header (should): the sticky pill gets a deeper shadow only after scrolling; the search field opens, submits to `/shop?q=` and closes with Escape, a click outside or Tab leaving.
 
 ## 3. Accounts
 - API (must): register (email lower case, duplicate → `409 EMAIL_TAKEN`), login wrong email and wrong password give the same `401`, password hash never returned, `remember` changes cookie length.

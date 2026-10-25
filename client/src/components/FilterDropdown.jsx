@@ -36,8 +36,8 @@ export default function FilterDropdown({ label, count = 0, children, panelClassN
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((isOpen) => !isOpen)}
-        className={`flex min-h-11 items-center gap-2 rounded-full border bg-white px-4 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-          count > 0 ? 'border-primary' : 'border-border'
+        className={`flex min-h-11 items-center gap-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+          count > 0 ? 'font-medium' : ''
         }`}
       >
         {count > 0 ? `${label} (${count})` : label}
