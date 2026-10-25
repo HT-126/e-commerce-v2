@@ -22,6 +22,8 @@ API requests for checking the app by hand, and for anyone who clones the repo.
 
 **Reviews folder:** run it from top to bottom. It signs in as the demo customer (set `demoEmail` and `demoPassword` first), who has the seed's `delivered` order, and writes, changes and deletes one review of a product from that order. It deletes any earlier review of that product first and ends by deleting its own, so the shown rating ends where it started. It ends signed out.
 
+**Admin folder:** run it from top to bottom (50 requests; set `adminEmail` and `adminPassword` first). It registers one new customer, who buys two orders; the admin ships and delivers one, cancels the other (checking the stock came back), deletes a spam review of the delivered one, and creates, edits and hides a product. It really changes your dev database: it takes 3 units of stock from one product (2 come back when order B is cancelled), leaves one hidden `postman-dress-...` product, two orders and one customer behind. It signs in and out several times and ends signed out.
+
 Cookies: the sign-in request sets the `token` cookie. Postman keeps it for later requests to `localhost:3002`, so run sign in first. To start over, delete the cookie in Postman's **Cookies** window.
 
 ## Rules (for Claude and for you)

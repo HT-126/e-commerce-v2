@@ -3635,6 +3635,1997 @@
           }
         }
       ]
+    },
+    {
+      "name": "Admin",
+      "description": "Run from top to bottom. A new customer buys two orders. The admin ships and delivers one, cancels the other (the stock comes back), deletes a spam review of the delivered one, then creates, edits and hides a product. It needs adminEmail and adminPassword (the seeded admin). It registers one customer per run (10 per hour per IP) and leaves one hidden `postman-...` product and two orders behind in your dev database. It ends signed out.",
+      "item": [
+        {
+          "name": "Setup: pick a product in stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const open = pm.response.json().data.items.find((p) => !p.soldOut);",
+                  "pm.test(\"a product in stock\", () => pm.expect(open).to.be.an(\"object\"));",
+                  "pm.collectionVariables.set(\"adminSlug\", open.slug);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?limit=24",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ]
+            },
+            "description": "Saves the slug of the first product that is not sold out in `adminSlug`."
+          }
+        },
+        {
+          "name": "Setup: a variant of that product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const product = pm.response.json().data;",
+                  "const variant = product.variants.find((v) => v.inStock);",
+                  "pm.test(\"a variant in stock\", () => pm.expect(variant).to.be.an(\"object\"));",
+                  "pm.collectionVariables.set(\"adminVariant\", variant.id);",
+                  "pm.collectionVariables.set(\"adminReviewCountBefore\", String(product.reviewCount));",
+                  "pm.collectionVariables.set(\"adminRatingBefore\", String(product.ratingAvg));",
+                  "pm.collectionVariables.set(\"adminTitleQuery\", encodeURIComponent(product.title));",
+                  "pm.collectionVariables.set(\"adminSuffix\", String(Date.now()));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{adminSlug}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{adminSlug}}"
+              ]
+            },
+            "description": "Saves the id of the first variant in stock in `adminVariant`, and the product's review count and rating."
+          }
+        },
+        {
+          "name": "Register the customer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"adminCustomerEmail\", \"postman-admin-\" + Date.now() + \"@example.com\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"a customer\", () => pm.expect(pm.response.json().data.user.role).to.eql(\"customer\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "A new customer, signed in. Their orders are what the admin handles below.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Postman\",\n  \"lastName\": \"Customer\",\n  \"email\": \"{{adminCustomerEmail}}\",\n  \"password\": \"password123\",\n  \"acceptTerms\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: a customer cannot list the admin's products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"error code FORBIDDEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"FORBIDDEN\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products"
+              ]
+            },
+            "description": "Signed in, but not an admin: `403 FORBIDDEN`."
+          }
+        },
+        {
+          "name": "Error: a customer cannot change an order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"error code FORBIDDEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"FORBIDDEN\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/LM-000000-0000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "LM-000000-0000"
+              ]
+            },
+            "description": "Even an order that does not exist: the whole `/api/admin` path is guarded, so it is 403 and not 404.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shipped\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: a customer cannot set a stock number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"error code FORBIDDEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"FORBIDDEN\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants/{{adminVariant}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "variants",
+                "{{adminVariant}}"
+              ]
+            },
+            "description": "Stock numbers are only for the admin.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": 999\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "The customer puts 1 in the bag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/items/{{adminVariant}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items",
+                "{{adminVariant}}"
+              ]
+            },
+            "description": "For the first order.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "The customer pays: order A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"adminOrderA\", pm.response.json().data.orderNumber);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Order A, which the admin will ship and deliver."
+          }
+        },
+        {
+          "name": "The customer puts 2 in the bag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/items/{{adminVariant}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items",
+                "{{adminVariant}}"
+              ]
+            },
+            "description": "For the second order.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "The customer pays: order B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"adminOrderB\", pm.response.json().data.orderNumber);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Order B (2 units), which the admin will cancel."
+          }
+        },
+        {
+          "name": "Logout the customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Ends the session."
+          }
+        },
+        {
+          "name": "Error: the admin's products when signed out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"error code UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products"
+              ]
+            },
+            "description": "No session: `401 UNAUTHORIZED`."
+          }
+        },
+        {
+          "name": "Login: the admin",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const missing = [\"adminEmail\",\"adminPassword\"].filter((name) => !pm.variables.get(name));",
+                  "if (missing.length) throw new Error(\"Not sent. Set the current value of the collection variable(s): \" + missing.join(\", \") + \". Importing the collection again clears them. See postman/README.md.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"role is admin\", () => pm.expect(pm.response.json().data.user.role).to.eql(\"admin\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Uses the adminEmail and adminPassword collection variables (current values, from server/.env)."
+          }
+        },
+        {
+          "name": "Find the product and its stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const found = pm.response.json().data.items.find((p) => p.slug === pm.collectionVariables.get(\"adminSlug\"));",
+                  "pm.test(\"the admin list has the product\", () => pm.expect(found).to.be.an(\"object\"));",
+                  "pm.collectionVariables.set(\"adminProductId\", found.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products?q={{adminTitleQuery}}&limit=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products"
+              ]
+            },
+            "description": "Finds the product by its slug among the products whose title contains its title (the catalog has thousands, so it is searched, not paged through)."
+          }
+        },
+        {
+          "name": "The product with its stock (after both orders)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const variant = pm.response.json().data.variants.find((v) => v.id === Number(pm.collectionVariables.get(\"adminVariant\")));",
+                  "pm.test(\"a variant with a stock number\", () => pm.expect(variant.stock).to.be.a(\"number\"));",
+                  "pm.collectionVariables.set(\"adminStockBefore\", String(variant.stock));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{adminProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products",
+                "{{adminProductId}}"
+              ]
+            },
+            "description": "The admin sees stock numbers. Saves the stock of the variant, to compare after the cancel."
+          }
+        },
+        {
+          "name": "Orders: search for order A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"order A is the only match, and it is paid\", () => { pm.expect(data.items).to.have.lengthOf(1); pm.expect(data.items[0].orderNumber).to.eql(pm.collectionVariables.get(\"adminOrderA\")); pm.expect(data.items[0].status).to.eql(\"paid\"); pm.expect(data.items[0].email).to.eql(pm.collectionVariables.get(\"adminCustomerEmail\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders?q={{adminOrderA}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders"
+              ]
+            },
+            "description": "The list searches by order number or email."
+          }
+        },
+        {
+          "name": "Order A: the detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const order = pm.response.json().data;",
+                  "pm.test(\"the customer and the allowed changes\", () => { pm.expect(order.customer.firstName).to.eql(\"Postman\"); pm.expect(order.email).to.eql(pm.collectionVariables.get(\"adminCustomerEmail\")); pm.expect(order.allowedStatuses).to.eql([\"shipped\", \"cancelled\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/{{adminOrderA}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "{{adminOrderA}}"
+              ]
+            },
+            "description": "The order, the customer and the changes allowed now (`allowedStatuses`)."
+          }
+        },
+        {
+          "name": "Error: order A cannot be delivered before it is shipped",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"error code INVALID_STATUS_CHANGE\", () => pm.expect(pm.response.json().error.code).to.eql(\"INVALID_STATUS_CHANGE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/{{adminOrderA}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "{{adminOrderA}}"
+              ]
+            },
+            "description": "Only the changes in the rules are allowed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"delivered\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Order A: shipped",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"shipped, and only delivered is next\", () => { const order = pm.response.json().data; pm.expect(order.status).to.eql(\"shipped\"); pm.expect(order.allowedStatuses).to.eql([\"delivered\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/{{adminOrderA}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "{{adminOrderA}}"
+              ]
+            },
+            "description": "paid to shipped.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shipped\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Order A: delivered",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"delivered, nothing is next\", () => { const order = pm.response.json().data; pm.expect(order.status).to.eql(\"delivered\"); pm.expect(order.allowedStatuses).to.eql([]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/{{adminOrderA}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "{{adminOrderA}}"
+              ]
+            },
+            "description": "shipped to delivered. Now the customer may review the product.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"delivered\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: a delivered order cannot be cancelled",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"error code INVALID_STATUS_CHANGE\", () => pm.expect(pm.response.json().error.code).to.eql(\"INVALID_STATUS_CHANGE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/{{adminOrderA}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "{{adminOrderA}}"
+              ]
+            },
+            "description": "A delivered order never loses the purchase behind a review.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelled\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Order B: cancel",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"cancelled\", () => pm.expect(pm.response.json().data.status).to.eql(\"cancelled\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/{{adminOrderB}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "{{adminOrderB}}"
+              ]
+            },
+            "description": "paid to cancelled. The 2 units go back into stock in the same transaction.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelled\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "The stock is back: 2 more units",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const variant = pm.response.json().data.variants.find((v) => v.id === Number(pm.collectionVariables.get(\"adminVariant\")));",
+                  "pm.test(\"stock went up by 2\", () => pm.expect(variant.stock).to.eql(Number(pm.collectionVariables.get(\"adminStockBefore\")) + 2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{adminProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products",
+                "{{adminProductId}}"
+              ]
+            },
+            "description": "The variant has the units of order B again."
+          }
+        },
+        {
+          "name": "Error: order B cannot be cancelled twice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"error code INVALID_STATUS_CHANGE\", () => pm.expect(pm.response.json().error.code).to.eql(\"INVALID_STATUS_CHANGE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/{{adminOrderB}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "{{adminOrderB}}"
+              ]
+            },
+            "description": "The stock is given back only once.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelled\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: an unknown order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"error code NOT_FOUND\", () => pm.expect(pm.response.json().error.code).to.eql(\"NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/LM-000000-0000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "LM-000000-0000"
+              ]
+            },
+            "description": "As the admin, an order that does not exist is a 404.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shipped\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Logout the admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Ends the session."
+          }
+        },
+        {
+          "name": "Login: the customer again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"a customer\", () => pm.expect(pm.response.json().data.user.role).to.eql(\"customer\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Signs in as the customer this folder registered.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminCustomerEmail}}\",\n  \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "The customer writes a review (order A is delivered)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"saved\", () => pm.expect(pm.response.json().data.review.comment).to.eql(\"Postman spam\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{adminSlug}}/reviews/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{adminSlug}}",
+                "reviews",
+                "mine"
+              ]
+            },
+            "description": "A 1-star review, as the spam the admin deletes next.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 1,\n  \"comment\": \"Postman spam\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Logout the customer again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Ends the session."
+          }
+        },
+        {
+          "name": "Login: the admin again",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const missing = [\"adminEmail\",\"adminPassword\"].filter((name) => !pm.variables.get(name));",
+                  "if (missing.length) throw new Error(\"Not sent. Set the current value of the collection variable(s): \" + missing.join(\", \") + \". Importing the collection again clears them. See postman/README.md.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"role is admin\", () => pm.expect(pm.response.json().data.user.role).to.eql(\"admin\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Uses the adminEmail and adminPassword collection variables (current values, from server/.env)."
+          }
+        },
+        {
+          "name": "Reviews: find the spam review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const found = pm.response.json().data.items.find((r) => r.comment === \"Postman spam\");",
+                  "pm.test(\"the review is there, with the customer's email and the product\", () => { pm.expect(found).to.be.an(\"object\"); pm.expect(found.user.email).to.eql(pm.collectionVariables.get(\"adminCustomerEmail\")); pm.expect(found.product.slug).to.eql(pm.collectionVariables.get(\"adminSlug\")); });",
+                  "pm.collectionVariables.set(\"adminReviewId\", found.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reviews?productId={{adminProductId}}&limit=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reviews"
+              ]
+            },
+            "description": "The admin sees every review of the product, with the customer's email."
+          }
+        },
+        {
+          "name": "Reviews: delete it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reviews/{{adminReviewId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reviews",
+                "{{adminReviewId}}"
+              ]
+            },
+            "description": "204, and the product's shown rating and count are worked out again."
+          }
+        },
+        {
+          "name": "The product's rating is back where it was",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"same count and rating\", () => { const p = pm.response.json().data; pm.expect(p.reviewCount).to.eql(Number(pm.collectionVariables.get(\"adminReviewCountBefore\"))); pm.expect(String(p.ratingAvg)).to.eql(pm.collectionVariables.get(\"adminRatingBefore\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{adminSlug}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{adminSlug}}"
+              ]
+            },
+            "description": "The shown rating and count are what they were before the review."
+          }
+        },
+        {
+          "name": "Error: delete the same review again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"error code NOT_FOUND\", () => pm.expect(pm.response.json().error.code).to.eql(\"NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reviews/{{adminReviewId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reviews",
+                "{{adminReviewId}}"
+              ]
+            },
+            "description": "Already gone: 404."
+          }
+        },
+        {
+          "name": "Setup: a category for the new product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"adminCategoryId\", pm.response.json().data[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ]
+            },
+            "description": "Saves the id of the first category in `adminCategoryId`."
+          }
+        },
+        {
+          "name": "Products: create one",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "const product = pm.response.json().data;",
+                  "pm.test(\"the product we sent, with no variants yet\", () => { pm.expect(product.title).to.eql(\"Postman Dress \" + pm.collectionVariables.get(\"adminSuffix\")); pm.expect(product.priceCents).to.eql(4599); pm.expect(product.isActive).to.eql(true); pm.expect(product.variants).to.eql([]); pm.expect(product.images).to.have.lengthOf(1); });",
+                  "pm.collectionVariables.set(\"adminNewProductId\", product.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products"
+              ]
+            },
+            "description": "A new, active product with one photo and no variants yet.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Dress {{adminSuffix}}\",\n  \"slug\": \"postman-dress-{{adminSuffix}}\",\n  \"categoryId\": {{adminCategoryId}},\n  \"priceCents\": 4599,\n  \"isActive\": true,\n  \"highlights\": [\"Made by Postman\"],\n  \"images\": [{ \"url\": \"https://cdn.example/postman.webp\", \"alt\": \"Postman dress\" }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: create with the same slug",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"error code SLUG_TAKEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"SLUG_TAKEN\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products"
+              ]
+            },
+            "description": "A slug is unique: `409 SLUG_TAKEN`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Another\",\n  \"slug\": \"postman-dress-{{adminSuffix}}\",\n  \"categoryId\": {{adminCategoryId}},\n  \"priceCents\": 1000,\n  \"isActive\": true,\n  \"images\": [{ \"url\": \"https://cdn.example/x.webp\" }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: create with no photo and a price of 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"error code VALIDATION_ERROR\", () => pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"the details name both fields\", () => { const paths = pm.response.json().error.details.map((d) => d.path[0]); pm.expect(paths).to.include.members([\"priceCents\", \"images\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products"
+              ]
+            },
+            "description": "A product needs at least one photo and a price above 0.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bad\",\n  \"slug\": \"bad-product\",\n  \"categoryId\": {{adminCategoryId}},\n  \"priceCents\": 0,\n  \"isActive\": true,\n  \"images\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Products: edit the title and the price",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"changed, and the rest kept\", () => { const p = pm.response.json().data; pm.expect(p.title).to.eql(\"Postman Dress (edited)\"); pm.expect(p.priceCents).to.eql(5200); pm.expect(p.highlights).to.eql([\"Made by Postman\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{adminNewProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products",
+                "{{adminNewProductId}}"
+              ]
+            },
+            "description": "Only the fields that are sent change.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Dress (edited)\",\n  \"priceCents\": 5200\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Variants: add one (Black, M, stock 4)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "const variant = pm.response.json().data;",
+                  "pm.test(\"the variant we sent, first in the order\", () => { pm.expect(variant.color).to.eql(\"Black\"); pm.expect(variant.size).to.eql(\"M\"); pm.expect(variant.stock).to.eql(4); pm.expect(variant.position).to.eql(0); });",
+                  "pm.collectionVariables.set(\"adminNewVariantId\", variant.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{adminNewProductId}}/variants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products",
+                "{{adminNewProductId}}",
+                "variants"
+              ]
+            },
+            "description": "The color group for the shop filter is worked out from the color.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"PM-{{adminSuffix}}\",\n  \"color\": \"Black\",\n  \"size\": \"M\",\n  \"stock\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: the same color and size again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"error code VARIANT_TAKEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"VARIANT_TAKEN\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{adminNewProductId}}/variants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products",
+                "{{adminNewProductId}}",
+                "variants"
+              ]
+            },
+            "description": "`409 VARIANT_TAKEN`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"PM-OTHER-{{adminSuffix}}\",\n  \"color\": \"Black\",\n  \"size\": \"M\",\n  \"stock\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Error: the same SKU again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"error code SKU_TAKEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"SKU_TAKEN\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{adminNewProductId}}/variants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products",
+                "{{adminNewProductId}}",
+                "variants"
+              ]
+            },
+            "description": "`409 SKU_TAKEN`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"PM-{{adminSuffix}}\",\n  \"color\": \"Red\",\n  \"size\": \"S\",\n  \"stock\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "The shop shows the new product with the variant in stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const product = pm.response.json().data;",
+                  "pm.test(\"the edited product, the variant in stock\", () => { pm.expect(product.title).to.eql(\"Postman Dress (edited)\"); pm.expect(product.priceCents).to.eql(5200); pm.expect(product.variants).to.have.lengthOf(1); pm.expect(product.variants[0].inStock).to.eql(true); });",
+                  "pm.test(\"no stock number in the response\", () => pm.expect(pm.response.text()).to.not.match(/\"stock\"/i));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/postman-dress-{{adminSuffix}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "postman-dress-{{adminSuffix}}"
+              ]
+            },
+            "description": "The customer's product page, with the new title and price, and no stock number."
+          }
+        },
+        {
+          "name": "Stock: set it to 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"stock 0\", () => pm.expect(pm.response.json().data.stock).to.eql(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants/{{adminNewVariantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "variants",
+                "{{adminNewVariantId}}"
+              ]
+            },
+            "description": "An exact number. At 0 the shop shows the variant as sold out.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "The shop shows it sold out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the variant is sold out\", () => pm.expect(pm.response.json().data.variants[0].inStock).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/postman-dress-{{adminSuffix}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "postman-dress-{{adminSuffix}}"
+              ]
+            },
+            "description": "Sold out, not hidden."
+          }
+        },
+        {
+          "name": "Error: a negative stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"error code VALIDATION_ERROR\", () => pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants/{{adminNewVariantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "variants",
+                "{{adminNewVariantId}}"
+              ]
+            },
+            "description": "Stock is a whole number, 0 or more.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": -1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Products: hide it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"hidden\", () => pm.expect(pm.response.json().data.isActive).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{adminNewProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products",
+                "{{adminNewProductId}}"
+              ]
+            },
+            "description": "There is no delete: hiding takes it out of the shop.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "The shop no longer has it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"error code NOT_FOUND\", () => pm.expect(pm.response.json().error.code).to.eql(\"NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/postman-dress-{{adminSuffix}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "postman-dress-{{adminSuffix}}"
+              ]
+            },
+            "description": "A hidden product's page is a 404."
+          }
+        },
+        {
+          "name": "The admin still sees it, as hidden",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the product is in the hidden list, with its variant and stock\", () => { const found = pm.response.json().data.items.find((p) => p.id === Number(pm.collectionVariables.get(\"adminNewProductId\"))); pm.expect(found.isActive).to.eql(false); pm.expect(found.variantCount).to.eql(1); pm.expect(found.totalStock).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products?active=false&q=Postman Dress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "products"
+              ]
+            },
+            "description": "The admin's list includes hidden products and can filter for them."
+          }
+        },
+        {
+          "name": "Logout the admin (end)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Ends the session."
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -3775,6 +5766,81 @@
     },
     {
       "key": "longComment",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminSlug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminVariant",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminSuffix",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminReviewCountBefore",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminRatingBefore",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminTitleQuery",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminCustomerEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminOrderA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminOrderB",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminProductId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminStockBefore",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminReviewId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminCategoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminNewProductId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminNewVariantId",
       "value": "",
       "type": "string"
     }
