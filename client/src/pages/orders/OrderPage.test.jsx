@@ -86,6 +86,28 @@ describe('OrderPage', () => {
     expect(screen.queryByText('Thank you! Your order is confirmed.')).not.toBeInTheDocument();
   });
 
+  it('offers "Write a review" for each item of a delivered order, linking to the reviews of the product', async () => {
+    const order = anOrder({
+      status: 'delivered',
+      items: [anOrderItem(), anOrderItem({ productSlug: 'red-top', title: 'Red Top', color: 'Red', size: 'S' })],
+    });
+    renderOrder({ body: { data: order } });
+
+    const links = await screen.findAllByRole('link', { name: 'Write a review' });
+
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      '/products/blue-dress#reviews',
+      '/products/red-top#reviews',
+    ]);
+  });
+
+  it.each(['paid', 'shipped', 'cancelled'])('offers no review link for a %s order', async (status) => {
+    renderOrder({ body: { data: anOrder({ status }) } });
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.queryByRole('link', { name: 'Write a review' })).not.toBeInTheDocument();
+  });
+
   it('links to the shop and to all orders', async () => {
     renderOrder({ body: { data: anOrder() } });
 

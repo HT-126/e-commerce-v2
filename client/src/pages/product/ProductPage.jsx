@@ -5,6 +5,7 @@ import { useProduct, useRelatedProducts } from '../../hooks/use-catalog.js';
 import NotFoundPage from '../NotFoundPage.jsx';
 import ProductView, { Breadcrumb } from './ProductView.jsx';
 import { AboutSection, DetailsSection, RatingSection, SizeChartSection } from './ProductSections.jsx';
+import ReviewsSection from './ReviewsSection.jsx';
 
 // Column names differ per product ("Bust" or "Sleeve Length (in)"), so judge by the text, not the count.
 // A chart with long headers needs the full width; a short one sits beside the other two panels.
@@ -79,8 +80,10 @@ export default function ProductPage() {
         <SizeChartSection sizeChart={product.sizeChart} className={wideChart ? 'lg:col-span-2' : ''} />
       </div>
 
-      <div className="mt-6">
+      {/* "Write a review" links from the order history land here. */}
+      <div id="reviews" className="mt-6 scroll-mt-6">
         <RatingSection ratingAvg={product.ratingAvg} reviewCount={product.reviewCount} />
+        <ReviewsSection slug={product.slug} />
       </div>
 
       <Related slug={product.slug} />
