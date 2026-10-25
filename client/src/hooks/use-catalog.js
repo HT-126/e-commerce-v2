@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { getCategories, getProduct, getProducts, getRelatedProducts } from '../services/catalog.js';
+import {
+  getCategories,
+  getFilters,
+  getProduct,
+  getProducts,
+  getRelatedProducts,
+} from '../services/catalog.js';
 
 const FIVE_MINUTES = 5 * 60 * 1000;
 
@@ -8,6 +14,10 @@ const retryUnlessNotFound = (count, error) => error.status !== 404 && count < 2;
 
 export const useCategories = () =>
   useQuery({ queryKey: ['categories'], queryFn: getCategories, staleTime: FIVE_MINUTES });
+
+// Color groups and sizes for the shop filters.
+export const useFilters = () =>
+  useQuery({ queryKey: ['filters'], queryFn: getFilters, staleTime: FIVE_MINUTES });
 
 const withoutPage = (params) => JSON.stringify({ ...params, page: 0 });
 

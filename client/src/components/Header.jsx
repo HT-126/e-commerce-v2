@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, NavLink } from 'react-router';
+import { useRef, useState } from 'react';
+import { Link, NavLink, useNavigate, useSearchParams } from 'react-router';
 import { useCategories } from '../hooks/use-catalog.js';
 import { CloseIcon, MenuIcon, SearchIcon } from './icons.jsx';
 
@@ -10,8 +10,39 @@ const categoryLink = ({ isActive }) =>
 // Account and Bag icons come with the Accounts and Cart features, so there are no dead links yet.
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchButtonRef = useRef(null);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: categories = [] } = useCategories();
-  const close = () => setMenuOpen(false);
+  const close = () => {
+    setMenuOpen(false);
+    setSearchOpen(false);
+  };
+
+  function toggleMenu() {
+    setSearchOpen(false);
+    setMenuOpen((open) => !open);
+  }
+
+  function toggleSearch() {
+    setMenuOpen(false);
+    setSearchOpen((open) => !open);
+  }
+
+  // An empty search shows all products again.
+  function submitSearch(event) {
+    event.preventDefault();
+    const text = new FormData(event.currentTarget).get('q').trim();
+    setSearchOpen(false);
+    navigate(text ? `/shop?${new URLSearchParams({ q: text })}` : '/shop');
+  }
+
+  function closeSearchOnEscape(event) {
+    if (event.key !== 'Escape') return;
+    setSearchOpen(false);
+    searchButtonRef.current?.focus();
+  }
 
   const links = [
     // A plain link: NavLink ignores the query string, so it would look active on every shop page.
@@ -37,25 +68,51 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-1">
-          <Link
-            to="/shop"
+          <button
+            ref={searchButtonRef}
+            type="button"
             aria-label="Search"
+            aria-expanded={searchOpen}
+            aria-controls="header-search"
+            onClick={toggleSearch}
             className="flex size-11 items-center justify-center rounded-full hover:bg-panel"
           >
             <SearchIcon />
-          </Link>
+          </button>
           <button
             type="button"
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={toggleMenu}
             className="flex size-11 items-center justify-center rounded-full hover:bg-panel xl:hidden"
           >
             {menuOpen ? <CloseIcon /> : <MenuIcon />}
           </button>
         </div>
       </div>
+
+      {searchOpen && (
+        <form
+          id="header-search"
+          role="search"
+          onSubmit={submitSearch}
+          onKeyDown={closeSearchOnEscape}
+          className="mt-2 flex items-center gap-2 rounded-full bg-white px-5 py-2 shadow-sm"
+        >
+          <SearchIcon className="size-5 shrink-0 text-ink-soft" />
+          <input
+            autoFocus
+            type="search"
+            name="q"
+            defaultValue={searchParams.get('q') ?? ''}
+            placeholder="Search by title"
+            aria-label="Search by title"
+            maxLength={100}
+            className="min-h-11 flex-1 bg-transparent text-sm outline-none"
+          />
+        </form>
+      )}
 
       {menuOpen && (
         <nav

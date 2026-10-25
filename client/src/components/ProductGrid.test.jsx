@@ -44,6 +44,25 @@ describe('ProductGrid', () => {
     expect(screen.getByText('$44.99', { exact: true })).toBeInTheDocument();
   });
 
+  it('shows an action under the empty message when one is given', () => {
+    const onClick = vi.fn();
+    renderGrid({
+      items: [],
+      emptyMessage: 'Nothing here.',
+      emptyAction: <button onClick={onClick}>Clear it</button>,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear it' }));
+
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('shows no action when there is none', () => {
+    renderGrid({ items: [], emptyMessage: 'Nothing here.' });
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
   it('marks a sold-out product', () => {
     renderGrid({ items: [productCard({ soldOut: true })] });
 

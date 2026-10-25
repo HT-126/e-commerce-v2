@@ -11,6 +11,7 @@ export default function ProductGrid({
   onRetry,
   skeletonCount = 8,
   emptyMessage = 'No products found.',
+  emptyAction = null,
 }) {
   if (isPending) {
     return (
@@ -34,7 +35,12 @@ export default function ProductGrid({
   }
 
   if (items.length === 0) {
-    return <p className="rounded-[28px] bg-card p-8 text-center text-ink-soft">{emptyMessage}</p>;
+    return (
+      <div className="rounded-[28px] bg-card p-8 text-center">
+        <p className="text-ink-soft">{emptyMessage}</p>
+        {emptyAction && <div className="mt-4">{emptyAction}</div>}
+      </div>
+    );
   }
 
   return (
