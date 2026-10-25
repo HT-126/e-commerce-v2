@@ -18,6 +18,10 @@ import './index.css';
 
 const queryClient = new QueryClient();
 
+// Admin pages load only when one is opened, so Radix, the table library and the other admin code are not part of
+// the shop's first load.
+const lazyPage = (load) => ({ lazy: async () => ({ Component: (await load()).default }) });
+
 const router = createBrowserRouter([
   {
     element: <Layout />,
@@ -30,6 +34,17 @@ const router = createBrowserRouter([
       { path: '/orders/:orderNumber', element: <RequireUser><OrderPage /></RequireUser> },
       { path: '/account/orders', element: <RequireUser><OrdersPage /></RequireUser> },
       { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+  // The owner's area. `AdminRoot` checks the role and holds the layout; the pages are its children.
+  {
+    path: '/admin',
+    ...lazyPage(() => import('./pages/admin/AdminRoot.jsx')),
+    HydrateFallback: () => <div className="min-h-screen bg-page" />,
+    children: [
+      { path: 'orders', ...lazyPage(() => import('./pages/admin/orders/OrdersPage.jsx')) },
+      { path: 'orders/:orderNumber', ...lazyPage(() => import('./pages/admin/orders/OrderDetailPage.jsx')) },
+      { path: 'reviews', ...lazyPage(() => import('./pages/admin/reviews/ReviewsPage.jsx')) },
     ],
   },
   // Sign in and register have their own slim layout (no shop menu, no footer). Their code (the form
