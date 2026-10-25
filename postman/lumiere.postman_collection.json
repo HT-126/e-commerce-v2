@@ -39,6 +39,341 @@
           }
         }
       ]
+    },
+    {
+      "name": "Catalog",
+      "item": [
+        {
+          "name": "Categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"8 categories with name and slug\", () => { pm.expect(data).to.have.lengthOf(8); data.forEach((c) => pm.expect(c).to.have.all.keys(\"id\", \"name\", \"slug\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ]
+            },
+            "description": "The 8 categories in menu order."
+          }
+        },
+        {
+          "name": "List products (default)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test(\"12 cards, page 1, total 2242\", () => { pm.expect(data.items).to.have.lengthOf(12); pm.expect(data.page).to.eql(1); pm.expect(data.total).to.eql(2242); });",
+                  "pm.test(\"card shape\", () => pm.expect(data.items[0]).to.have.all.keys(\"id\", \"slug\", \"title\", \"priceCents\", \"ratingAvg\", \"reviewCount\", \"imageUrl\", \"imageAlt\", \"soldOut\"));",
+                  "const keys = (v) => Array.isArray(v) ? v.flatMap(keys) : (v && typeof v === \"object\") ? Object.entries(v).flatMap(([k, x]) => [k, ...keys(x)]) : [];",
+                  "pm.test(\"no stock number in the response\", () => pm.expect(keys(pm.response.json())).to.not.include(\"stock\"));",
+                  "pm.collectionVariables.set(\"productSlug\", data.items[0].slug);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ]
+            },
+            "description": "Newest first, 12 per page. Saves the first slug in {{productSlug}} for the requests below."
+          }
+        },
+        {
+          "name": "Top rated",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const ratings = pm.response.json().data.items.map((p) => p.ratingAvg);",
+                  "pm.test(\"ratings never go up\", () => ratings.forEach((r, i) => { if (i > 0 && r !== null) pm.expect(r).to.be.at.most(ratings[i - 1] ?? 5); }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?sort=rating&limit=8",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "rating"
+                },
+                {
+                  "key": "limit",
+                  "value": "8"
+                }
+              ]
+            },
+            "description": "Highest rating first; products without a rating come last."
+          }
+        },
+        {
+          "name": "Filter: dresses under $45, cheapest first",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().data.items;",
+                  "pm.test(\"every price is 4499 or less\", () => items.forEach((p) => pm.expect(p.priceCents).to.be.at.most(4499)));",
+                  "pm.test(\"prices go up\", () => items.forEach((p, i) => { if (i > 0) pm.expect(p.priceCents).to.be.at.least(items[i - 1].priceCents); }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?category=dresses&maxPriceCents=4499&sort=price_asc&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "dresses"
+                },
+                {
+                  "key": "maxPriceCents",
+                  "value": "4499"
+                },
+                {
+                  "key": "sort",
+                  "value": "price_asc"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Category, price limit and sort together."
+          }
+        },
+        {
+          "name": "Search by title",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"every title has the word\", () => pm.response.json().data.items.forEach((p) => pm.expect(p.title.toLowerCase()).to.include(\"dress\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?q=dress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "dress"
+                }
+              ]
+            },
+            "description": "Title search, ignoring case."
+          }
+        },
+        {
+          "name": "Error: limit above 48",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code is VALIDATION_ERROR\", () => pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_ERROR\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?limit=49",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "49"
+                }
+              ]
+            },
+            "description": "Expect 400 VALIDATION_ERROR (limit is not clamped)."
+          }
+        },
+        {
+          "name": "Product detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().data;",
+                  "pm.test(\"has category, images and variants\", () => { pm.expect(p.category).to.have.all.keys(\"name\", \"slug\"); pm.expect(p.images.length).to.be.above(0); pm.expect(p.variants.length).to.be.above(0); });",
+                  "pm.test(\"variants use inStock booleans\", () => p.variants.forEach((v) => pm.expect(v.inStock).to.be.a(\"boolean\")));",
+                  "const keys = (v) => Array.isArray(v) ? v.flatMap(keys) : (v && typeof v === \"object\") ? Object.entries(v).flatMap(([k, x]) => [k, ...keys(x)]) : [];",
+                  "pm.test(\"no stock number in the response\", () => pm.expect(keys(pm.response.json())).to.not.include(\"stock\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{productSlug}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{productSlug}}"
+              ]
+            },
+            "description": "Run \"List products (default)\" first. Colors, sizes and variants in display order; inStock is true or false, never a number."
+          }
+        },
+        {
+          "name": "Related products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().data;",
+                  "pm.test(\"at most 4, not the same product\", () => { pm.expect(items.length).to.be.at.most(4); items.forEach((p) => pm.expect(p.slug).to.not.eql(pm.collectionVariables.get(\"productSlug\"))); });",
+                  "const keys = (v) => Array.isArray(v) ? v.flatMap(keys) : (v && typeof v === \"object\") ? Object.entries(v).flatMap(([k, x]) => [k, ...keys(x)]) : [];",
+                  "pm.test(\"no stock number in the response\", () => pm.expect(keys(pm.response.json())).to.not.include(\"stock\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{productSlug}}/related",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{productSlug}}",
+                "related"
+              ]
+            },
+            "description": "Up to 4 from the same category, not the product itself."
+          }
+        },
+        {
+          "name": "Error: unknown product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"code is NOT_FOUND\", () => pm.expect(pm.response.json().error.code).to.eql(\"NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/no-such-product",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "no-such-product"
+              ]
+            },
+            "description": "Expect 404 NOT_FOUND."
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -49,6 +384,11 @@
     },
     {
       "key": "demoPassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productSlug",
       "value": "",
       "type": "string"
     }
