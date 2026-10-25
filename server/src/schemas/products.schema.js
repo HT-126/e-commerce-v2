@@ -7,7 +7,7 @@ export const SORTS = ['newest', 'rating', 'price_asc', 'price_desc'];
 
 // An empty value in the URL (`?q=`) counts as not sent.
 const blankToUndefined = (value) => (value === '' ? undefined : value);
-const param = (schema) => z.preprocess(blankToUndefined, schema);
+export const param = (schema) => z.preprocess(blankToUndefined, schema);
 
 // "black, white" becomes ['black', 'white']: trimmed, no empty parts, no duplicates.
 const MAX_COLORS = 15;

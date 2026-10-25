@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildOrderNumber, sortByVariant } from '../../src/utils/order.js';
+import { allowedStatuses, buildOrderNumber, sortByVariant } from '../../src/utils/order.js';
 
 describe('buildOrderNumber', () => {
   it('is LM, the UTC date as YYMMDD and 4 digits', () => {
@@ -31,5 +31,24 @@ describe('sortByVariant', () => {
 
     expect(sortByVariant(lines).map((line) => line.variantId)).toEqual([2, 5, 9]);
     expect(lines.map((line) => line.variantId)).toEqual([9, 2, 5]);
+  });
+});
+
+describe('allowedStatuses', () => {
+  it('lets a paid order be shipped or cancelled', () => {
+    expect(allowedStatuses('paid')).toEqual(['shipped', 'cancelled']);
+  });
+
+  it('lets a shipped order only be delivered', () => {
+    expect(allowedStatuses('shipped')).toEqual(['delivered']);
+  });
+
+  it('lets a delivered or a cancelled order change no more', () => {
+    expect(allowedStatuses('delivered')).toEqual([]);
+    expect(allowedStatuses('cancelled')).toEqual([]);
+  });
+
+  it('allows nothing for a status it does not know', () => {
+    expect(allowedStatuses('refunded')).toEqual([]);
   });
 });
