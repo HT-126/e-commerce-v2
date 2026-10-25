@@ -263,6 +263,62 @@ describe('Header', () => {
       expect(await screen.findByRole('link', { name: 'Sign in' })).toBeInTheDocument();
     });
 
+    it('a failed Sign out (server error) keeps the user signed in, keeps the panel open, and says so', async () => {
+      renderHeader('/', {
+        user: aUser(),
+        logout: { status: 500, body: { error: { message: 'Something went wrong' } } },
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Account' }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not sign out. Please try again.');
+      expect(screen.getByText('anna@example.com')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled();
+    });
+
+    it('a failed Sign out (no network) also keeps the user signed in', async () => {
+      renderHeader('/', { user: aUser() });
+      fireEvent.click(await screen.findByRole('button', { name: 'Account' }));
+      const real = globalThis.fetch;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url, init) =>
+          url === '/api/auth/logout' ? Promise.reject(new TypeError('Failed to fetch')) : real(url, init),
+        ),
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not sign out');
+      expect(screen.getByText('anna@example.com')).toBeInTheDocument();
+    });
+
+    it('the failure message is gone when the panel is closed and opened again', async () => {
+      renderHeader('/', { user: aUser(), logout: { status: 500, body: { error: { message: 'x' } } } });
+      const button = await screen.findByRole('button', { name: 'Account' });
+      fireEvent.click(button);
+      fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+      await screen.findByRole('alert');
+
+      fireEvent.click(button);
+      fireEvent.click(button);
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('the Account panel closes when Tab moves focus out of the header', async () => {
+      renderHeader('/', { user: aUser() });
+      fireEvent.click(await screen.findByRole('button', { name: 'Account' }));
+      expect(screen.getByText('anna@example.com')).toBeInTheDocument();
+
+      fireEvent.focusIn(document.body);
+
+      expect(screen.queryByText('anna@example.com')).not.toBeInTheDocument();
+    });
+
     it('the Account panel closes on Escape (focus goes back), and on a click outside', async () => {
       renderHeader('/', { user: aUser() });
       const button = await screen.findByRole('button', { name: 'Account' });

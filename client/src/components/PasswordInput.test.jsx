@@ -7,7 +7,8 @@ describe('PasswordInput', () => {
     render(<PasswordInput label="Password" />);
 
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
-    expect(screen.getByRole('button', { name: 'Show password' })).toHaveAttribute('aria-pressed', 'false');
+    // One signal only: the name changes (Show / Hide). aria-pressed on top of that would read as a double negative.
+    expect(screen.getByRole('button', { name: 'Show password' })).not.toHaveAttribute('aria-pressed');
   });
 
   it('Show reveals it and Hide hides it again, without losing what was typed', () => {
@@ -18,7 +19,7 @@ describe('PasswordInput', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
     expect(box).toHaveAttribute('type', 'text');
     expect(box).toHaveValue('secret123');
-    expect(screen.getByRole('button', { name: 'Hide password' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Hide password' })).not.toHaveAttribute('aria-pressed');
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
     expect(box).toHaveAttribute('type', 'password');

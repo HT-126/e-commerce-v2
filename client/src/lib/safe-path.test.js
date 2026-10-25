@@ -12,6 +12,11 @@ describe('safeInternalPath', () => {
   });
 
   it.each([
+    ['a backslash that browsers read as a slash', '/\\evil.example'],
+    ['a slash, a backslash and a host', '/\\/evil.example'],
+    ['a tab before the second slash', '/\t/evil.example'],
+    ['a line break inside the path', '/shop\n/evil.example'],
+    ['a control character', '/shop\u0000'],
     ['another site', 'https://evil.example/login'],
     ['a protocol-relative address', '//evil.example'],
     ['a path without a slash', 'shop'],

@@ -78,6 +78,17 @@ describe('RegisterPage', () => {
     expect(bodiesSentTo(fetchMock, '/api/auth/register')).toEqual([]);
   });
 
+  it('links the terms error to the checkbox, so a screen reader hears it', async () => {
+    renderRegister();
+    await screen.findByLabelText('First name');
+
+    submit();
+
+    const checkbox = await screen.findByRole('checkbox', { name: /I agree to the Terms/ });
+    expect(checkbox).toHaveAttribute('aria-invalid', 'true');
+    expect(checkbox).toHaveAccessibleDescription('Please accept the terms');
+  });
+
   it.each([
     ['an invalid email', { 'Email address': 'anna@' }, 'Enter a valid email'],
     ['a password that is too short', { Password: '1234567' }, 'At least 8 characters'],

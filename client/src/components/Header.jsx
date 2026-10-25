@@ -24,8 +24,16 @@ export default function Header() {
   const { data: user, isPending: userLoading } = useMe();
   const logout = useLogout();
 
-  const close = () => setPanel(null);
-  const toggle = (name) => setPanel((current) => (current === name ? null : name));
+  const [signOutFailed, setSignOutFailed] = useState(false);
+
+  const close = () => {
+    setPanel(null);
+    setSignOutFailed(false);
+  };
+  const toggle = (name) => {
+    setSignOutFailed(false);
+    setPanel((current) => (current === name ? null : name));
+  };
 
   // An open panel closes on Escape (focus goes back to its button), a click outside, or Tab leaving the header.
   useEffect(() => {
@@ -58,9 +66,15 @@ export default function Header() {
     navigate(text ? `/shop?${new URLSearchParams({ q: text })}` : '/shop');
   }
 
+  // If signing out fails the user is still signed in, so the panel stays open and says so.
   async function signOut() {
-    await logout.mutateAsync().catch(() => {}); // signed out in the page either way (see useLogout)
-    close();
+    setSignOutFailed(false);
+    try {
+      await logout.mutateAsync();
+      close();
+    } catch {
+      setSignOutFailed(true);
+    }
   }
 
   const links = [
@@ -183,6 +197,11 @@ export default function Header() {
             >
               Sign out
             </button>
+            {signOutFailed && (
+              <p role="alert" className="pb-2 text-sm text-error">
+                Could not sign out. Please try again.
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useLocation } from 'react-router';
 import Button from '../../components/Button.jsx';
@@ -27,6 +27,7 @@ export default function RegisterPage() {
   const { data: user, isPending } = useMe();
   const registerUser = useRegister();
   const [formError, setFormError] = useState(null);
+  const termsErrorId = useId();
   const {
     register,
     handleSubmit,
@@ -92,6 +93,7 @@ export default function RegisterPage() {
               <input
                 type="checkbox"
                 aria-invalid={errors.acceptTerms ? true : undefined}
+                aria-describedby={errors.acceptTerms ? termsErrorId : undefined}
                 className="mt-0.5 size-5 shrink-0 accent-primary"
                 {...register('acceptTerms')}
               />
@@ -99,7 +101,7 @@ export default function RegisterPage() {
               <span>I agree to the Terms and Privacy Policy.</span>
             </label>
             {errors.acceptTerms && (
-              <p role="alert" className="px-8 pt-1 text-sm text-error">
+              <p id={termsErrorId} role="alert" className="px-8 pt-1 text-sm text-error">
                 {errors.acceptTerms.message}
               </p>
             )}
