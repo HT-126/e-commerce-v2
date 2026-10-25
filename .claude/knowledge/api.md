@@ -55,6 +55,8 @@ Money is always integer cents. Dates are ISO 8601 strings. Customer routes never
 ### `GET /api/products`
 - Query (all optional): `category` (slug), `sort` (`newest` | `rating` | `price_asc` | `price_desc`, default `newest`), `maxPriceCents`, `q` (search in title), `page` (default 1), `limit` (default 12, max 48)
 - Home tabs: New arrivals = `sort=newest`, Top rated = `sort=rating`, Under $45 = `maxPriceCents=4499`.
+- A `limit` above 48 is rejected with `400 VALIDATION_ERROR` (not clamped). An empty `q`, `category` or `maxPriceCents` counts as not sent. An unknown `category` slug gives an empty list.
+- Inactive products never appear. `soldOut` is true when no variant has stock; the stock number is never returned.
 - Response `200`: `{ data: { items: [productCard], page, limit, total } }`
 - `productCard` = `{ id, slug, title, priceCents, ratingAvg, reviewCount, imageUrl, imageAlt, soldOut }`
 - Schema: `listProductsSchema` (query)
@@ -67,7 +69,9 @@ Money is always integer cents. Dates are ISO 8601 strings. Customer routes never
 - Schema: `getProductSchema` (params)
 
 ### `GET /api/products/:slug/related`
-- Response `200`: `{ data: [productCard] }` (up to 4, same category, active, not the same product)
+- Response `200`: `{ data: [productCard] }` (up to 4, same category, active, not the same product, newest first)
+- Errors: `404` (unknown or inactive slug)
+- Schema: `getProductSchema` (params)
 
 ## Reviews
 
