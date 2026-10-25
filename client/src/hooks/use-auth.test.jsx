@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCartStore } from '../stores/cart-store.js';
 import { aCart, aUser, stubApi } from '../test-utils.jsx';
-import { useLogout, useMe } from './use-auth.js';
+import { useLogin, useLogout, useMe, useRegister } from './use-auth.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -130,5 +130,34 @@ describe('useLogout', () => {
       expect(useCartStore.getState().items).toEqual([{ variantId: 1, quantity: 2 }]);
       expect(queryClient.getQueryData(['cart'])).toEqual(aCart());
     });
+  });
+});
+
+describe('signing in', () => {
+  // A bag in the cache from a session that ended without a sign out.
+  const staleBag = aCart([{ variantId: 1, quantity: 3 }]);
+
+  it('drops a bag left in the cache from another user', async () => {
+    stubApi(() => ({ body: { data: { user: aUser({ id: 2 }) } } }));
+    const { queryClient, wrapper } = setup();
+    queryClient.setQueryData(['cart'], staleBag);
+    const { result } = renderHook(() => useLogin(), { wrapper });
+
+    await act(() => result.current.mutateAsync({ email: 'b@example.com', password: 'password123' }));
+
+    expect(queryClient.getQueryData(['cart'])).toBeUndefined();
+    expect(queryClient.getQueryData(['me'])).toEqual(aUser({ id: 2 }));
+  });
+
+  it('does the same after registering', async () => {
+    stubApi(() => ({ body: { data: { user: aUser({ id: 2 }) } } }));
+    const { queryClient, wrapper } = setup();
+    queryClient.setQueryData(['cart'], staleBag);
+    const { result } = renderHook(() => useRegister(), { wrapper });
+
+    await act(() => result.current.mutateAsync({ email: 'b@example.com' }));
+
+    expect(queryClient.getQueryData(['cart'])).toBeUndefined();
+    expect(queryClient.getQueryData(['me'])).toEqual(aUser({ id: 2 }));
   });
 });

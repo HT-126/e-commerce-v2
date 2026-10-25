@@ -141,6 +141,29 @@ describe('useCart', () => {
     expect(calledUrls(fetchMock)).not.toContain('/api/cart/quote');
   });
 
+  it('drops guest items the server does not know, so they cannot count on the Bag icon', async () => {
+    useCartStore.setState({
+      items: [
+        { variantId: 1, quantity: 2 },
+        { variantId: 99, quantity: 1 },
+      ],
+    });
+    const { wrapper } = setup();
+    // setup() stubs fetch too, so this stub goes second and replaces it.
+    stubApi((url, init) => {
+      if (url === '/api/auth/me') return signedOut;
+      const { items } = JSON.parse(init.body);
+      // The server leaves out variant 99.
+      const known = items.filter((item) => item.variantId !== 99);
+      return { body: { data: aCart(known.map((item) => aCartLine(item))) } };
+    });
+
+    const { result } = renderHook(() => useCart(), { wrapper });
+
+    await waitFor(() => expect(useCartStore.getState().items).toEqual([{ variantId: 1, quantity: 2 }]));
+    await waitFor(() => expect(result.current.cart.lines).toHaveLength(1));
+  });
+
   it('loads the bag from the account for a signed-in user', async () => {
     const { wrapper } = setup({ user: aUser() });
 

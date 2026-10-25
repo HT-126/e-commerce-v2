@@ -35,6 +35,16 @@ export function useCart() {
     retry: false,
   });
 
+  // The quote leaves out variants the server no longer knows. They could never be shown or removed, yet
+  // they would still count on the Bag icon, so they are dropped from the browser bag.
+  useEffect(() => {
+    if (!isGuest || !quote.isSuccess || quote.isPlaceholderData) return;
+    const known = new Set(quote.data.lines.map((line) => line.variantId));
+    for (const { variantId } of items) {
+      if (!known.has(variantId)) useCartStore.getState().remove(variantId);
+    }
+  }, [isGuest, quote.isSuccess, quote.isPlaceholderData, quote.data, items]);
+
   if (userLoading) return { cart: undefined, isLoading: true, isError: false, isGuest: false };
   if (user) {
     return {

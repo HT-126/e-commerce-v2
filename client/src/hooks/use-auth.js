@@ -12,14 +12,20 @@ const ME = ['me'];
 export const useMe = () => useQuery({ queryKey: ME, queryFn: getMe, staleTime: 60 * 1000, retry: false });
 
 // Signing in or registering puts the user straight into the cache, so the header changes at once.
+// Any bag left in the cache belongs to someone else (a session that ended without a sign out), so it goes.
+function signedIn(queryClient, user) {
+  queryClient.removeQueries({ queryKey: CART_KEY });
+  queryClient.setQueryData(ME, user);
+}
+
 export function useLogin() {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: login, onSuccess: (user) => queryClient.setQueryData(ME, user) });
+  return useMutation({ mutationFn: login, onSuccess: (user) => signedIn(queryClient, user) });
 }
 
 export function useRegister() {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: register, onSuccess: (user) => queryClient.setQueryData(ME, user) });
+  return useMutation({ mutationFn: register, onSuccess: (user) => signedIn(queryClient, user) });
 }
 
 // Signing out empties the bag in the browser. The account bag stays on the server.

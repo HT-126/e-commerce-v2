@@ -21,7 +21,8 @@ export default function CartLine({ line, disabled, onQuantity, onRemove }) {
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className={`flex items-start justify-between gap-3 ${soldOut ? 'opacity-60' : ''}`}>
+        {/* The text is not faded: the dimmed photo, the "Sold out" label and the missing stepper show the state. */}
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <Link
               to={`/products/${line.productSlug}`}
