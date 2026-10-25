@@ -28,24 +28,32 @@ Money is always integer cents. Dates are ISO 8601 strings. Customer routes never
 
 ## Auth
 
+### Session cookie
+Register and login set the cookie `token` (a JWT that holds only the user id): `httpOnly`, `SameSite=Lax`, `Path=/`, `Secure` in production. It lasts 30 days with `remember: true`, else 1 day, and the JWT expires with it. Every route marked "Auth: required" checks the token, then loads the user from the database (the role is never taken from the token). A missing, invalid or expired token, or a user that no longer exists, gives `401 UNAUTHORIZED`.
+
 ### `POST /api/auth/register`
 - Request: `{ firstName, lastName, email, password, acceptTerms: true }`
-- Response `201`: `{ data: { user } }` and sets the session cookie.
+- `firstName`, `lastName`: trimmed, 1 to 60 characters. `email`: trimmed, lower-cased, valid, up to 255. `password`: 8 to 72 bytes (bcrypt ignores the rest, so a longer one is rejected, not cut). `acceptTerms` must be `true`.
+- Response `201`: `{ data: { user } }` and sets the session cookie (1 day). The role is always `customer`.
 - Errors: `400`, `409 EMAIL_TAKEN`, `429`
 - Schema: `registerUserSchema`
 
 ### `POST /api/auth/login`
 - Request: `{ email, password, remember?: boolean }`
-- Response `200`: `{ data: { user } }` and sets the session cookie.
+- `email` is trimmed and lower-cased. `remember` defaults to `false`.
+- Response `200`: `{ data: { user } }` and sets the session cookie (30 days with `remember`, else 1 day).
+- A wrong email and a wrong password give the same `401 INVALID_CREDENTIALS` with the same message.
 - Errors: `400`, `401 INVALID_CREDENTIALS`, `429`
 - Schema: `loginUserSchema`
 
 ### `POST /api/auth/logout`
 - Auth: required. Response `204`. Clears the cookie.
+- Errors: `401`
 
 ### `GET /api/auth/me`
 - Auth: required. Response `200`: `{ data: { user } }`
 - `user` = `{ id, firstName, lastName, email, role }`. Never include the password hash.
+- Errors: `401`
 
 ## Catalog
 
