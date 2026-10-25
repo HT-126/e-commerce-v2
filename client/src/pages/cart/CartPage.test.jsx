@@ -2,7 +2,16 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCartStore } from '../../stores/cart-store.js';
-import { aCart, aCartLine, aUser, bodiesSentTo, calledUrls, renderRoute, stubApi } from '../../test-utils.jsx';
+import {
+  aCart,
+  aCartLine,
+  anOrder,
+  aUser,
+  bodiesSentTo,
+  calledUrls,
+  renderRoute,
+  stubApi,
+} from '../../test-utils.jsx';
 import CartPage from './CartPage.jsx';
 
 const signedOut = { status: 401, body: { error: { message: 'Please sign in', code: 'UNAUTHORIZED' } } };
@@ -23,11 +32,13 @@ const lineFor = (variantId, quantity, overrides = {}) =>
 // `user` null: a guest, whose bag is the store and is priced by the quote.
 // `bag`: a signed-in user's lines. `overrides`: per-variant changes to the lines. `fail`: URLs that answer 500.
 // `refuse`: URLs that answer 400, like the quote does for a bag it cannot accept.
-function renderCart({ user = null, bag = [], overrides = {}, fail = [], refuse = [] } = {}) {
+// `pay`: what `POST /api/orders` answers (an order by default).
+function renderCart({ user = null, bag = [], overrides = {}, fail = [], refuse = [], pay } = {}) {
   let account = [...bag];
   const fetchMock = stubApi((url, init) => {
     if (fail.includes(url)) return failure;
     if (refuse.includes(url)) return invalid;
+    if (url === '/api/orders') return pay ?? { status: 201, body: { data: anOrder() } };
     if (url === '/api/auth/me') return user ? { body: { data: { user } } } : signedOut;
     if (url === '/api/cart/quote') {
       const { items } = JSON.parse(init.body);
@@ -52,10 +63,21 @@ function renderCart({ user = null, bag = [], overrides = {}, fail = [], refuse =
     const { state } = useLocation();
     return <p data-testid="sign-in">sign in, back to {state?.from}</p>;
   }
+  function OrderPageStub() {
+    const { pathname, state } = useLocation();
+    return (
+      <p data-testid="order-page">
+        {pathname} placed={String(state?.placed)}
+      </p>
+    );
+  }
   renderRoute(<CartPage />, {
     path: '/cart',
     url: '/cart',
-    extraRoutes: <Route path="/login" element={<SignInPage />} />,
+    extraRoutes: [
+      <Route key="login" path="/login" element={<SignInPage />} />,
+      <Route key="order" path="/orders/:orderNumber" element={<OrderPageStub />} />,
+    ],
   });
   return fetchMock;
 }
@@ -143,11 +165,105 @@ describe('CartPage', () => {
     expect(await screen.findByTestId('sign-in')).toHaveTextContent('back to /cart');
   });
 
-  it('has no Pay button yet', async () => {
-    renderCart({ user: aUser(), bag: [lineFor(1, 1)] });
-    await screen.findByRole('link', { name: 'Dress 1' });
+  describe('Pay', () => {
+    const payButton = () => screen.getByRole('button', { name: /^Pay|Paying/ });
 
-    expect(screen.queryByRole('button', { name: /pay/i })).not.toBeInTheDocument();
+    it('shows a signed-in user "Pay" with the total, and no sign-in link', async () => {
+      renderCart({ user: aUser(), bag: [lineFor(1, 1)] });
+
+      expect(await screen.findByRole('button', { name: 'Pay $46.95' })).toBeEnabled();
+      expect(screen.queryByRole('link', { name: 'Sign in to pay' })).not.toBeInTheDocument();
+    });
+
+    it('shows a guest no Pay button', async () => {
+      guestBag({ variantId: 1, quantity: 1 });
+      renderCart();
+      await screen.findByRole('link', { name: 'Sign in to pay' });
+
+      expect(screen.queryByRole('button', { name: /^Pay/ })).not.toBeInTheDocument();
+    });
+
+    it('is disabled while a line cannot be bought', async () => {
+      renderCart({
+        user: aUser(),
+        bag: [lineFor(1, 1), lineFor(2, 1, { 2: { status: 'sold_out' } })],
+      });
+      await screen.findByRole('link', { name: 'Dress 2' });
+
+      expect(payButton()).toBeDisabled();
+    });
+
+    it('places the order and opens the confirmation', async () => {
+      const fetchMock = renderCart({ user: aUser(), bag: [lineFor(1, 1)] });
+      fireEvent.click(await screen.findByRole('button', { name: 'Pay $46.95' }));
+
+      expect(await screen.findByTestId('order-page')).toHaveTextContent('/orders/LM-261025-4821 placed=true');
+      expect(
+        fetchMock.mock.calls.filter(([url, init]) => url === '/api/orders' && init.method === 'POST'),
+      ).toHaveLength(1);
+    });
+
+    it('asks the server for the bag again after paying', async () => {
+      const fetchMock = renderCart({ user: aUser(), bag: [lineFor(1, 1)] });
+      await screen.findByRole('button', { name: 'Pay $46.95' });
+      const before = calledUrls(fetchMock).filter((url) => url === '/api/cart').length;
+
+      fireEvent.click(screen.getByRole('button', { name: 'Pay $46.95' }));
+      await screen.findByTestId('order-page');
+
+      await waitFor(() =>
+        expect(calledUrls(fetchMock).filter((url) => url === '/api/cart').length).toBeGreaterThan(before),
+      );
+    });
+
+    it('is disabled while the request runs, so a double click sends one order', async () => {
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const fetchMock = renderCart({ user: aUser(), bag: [lineFor(1, 1)] });
+      const answer = fetchMock.getMockImplementation();
+      fetchMock.mockImplementation(async (url, init) => {
+        if (url === '/api/orders') await gate;
+        return answer(url, init);
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Pay $46.95' }));
+
+      expect(await screen.findByRole('button', { name: 'Paying...' })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Paying...' }));
+      release();
+      await screen.findByTestId('order-page');
+
+      expect(fetchMock.mock.calls.filter(([url]) => url === '/api/orders')).toHaveLength(1);
+    });
+
+    it('names the lines that changed when the stock ran out, and shows the bag again', async () => {
+      const details = [{ variantId: 1, title: 'Dress 1', color: 'Blue', size: 'M' }];
+      const fetchMock = renderCart({
+        user: aUser(),
+        bag: [lineFor(1, 1)],
+        pay: { status: 409, body: { error: { code: 'STOCK_CHANGED', message: 'x', details } } },
+      });
+      await screen.findByRole('button', { name: 'Pay $46.95' });
+      const before = calledUrls(fetchMock).filter((url) => url === '/api/cart').length;
+
+      fireEvent.click(screen.getByRole('button', { name: 'Pay $46.95' }));
+
+      const alert = await screen.findByText('Some items changed while you were paying. Nothing was charged.');
+      expect(alert.closest('[role="alert"]')).toHaveTextContent('Dress 1, Blue, M');
+      expect(screen.queryByTestId('order-page')).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(calledUrls(fetchMock).filter((url) => url === '/api/cart').length).toBeGreaterThan(before),
+      );
+    });
+
+    it('says nothing was charged for any other failure, and lets the user try again', async () => {
+      renderCart({ user: aUser(), bag: [lineFor(1, 1)], pay: failure });
+      fireEvent.click(await screen.findByRole('button', { name: 'Pay $46.95' }));
+
+      expect(await screen.findByText('Could not place your order. Nothing was charged. Please try again.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Pay $46.95' })).toBeEnabled();
+    });
   });
 
   describe('lines that cannot be bought', () => {

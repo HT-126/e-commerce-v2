@@ -1,15 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import { MemoryRouter, Route, Routes, parsePath } from 'react-router';
 import { vi } from 'vitest';
 
 // Renders a page at a URL, with a fresh query cache that never retries.
 // `extraRoutes`: more <Route> elements, for example a page to land on after a redirect.
-export function renderRoute(element, { path = '/', url = '/', extraRoutes = null } = {}) {
+// `state`: the router state the page is opened with, like a link with `state` would give.
+export function renderRoute(element, { path = '/', url = '/', extraRoutes = null, state } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[url]}>
+      <MemoryRouter initialEntries={[state ? { ...parsePath(url), state } : url]}>
         <Routes>
           <Route path={path} element={element} />
           {extraRoutes}
@@ -72,6 +73,30 @@ export const aCart = (lines = []) => {
     canCheckout: lines.length > 0 && ok.length === lines.length,
   };
 };
+
+export const anOrderItem = (overrides = {}) => ({
+  productSlug: 'blue-dress',
+  title: 'Blue Dress',
+  color: 'Blue',
+  size: 'M',
+  imageUrl: 'https://cdn.example/blue.webp',
+  unitPriceCents: 4000,
+  quantity: 1,
+  lineTotalCents: 4000,
+  ...overrides,
+});
+
+// An order as the API returns it (api.md).
+export const anOrder = (overrides = {}) => ({
+  orderNumber: 'LM-261025-4821',
+  status: 'paid',
+  createdAt: '2026-10-25T12:00:00.000Z',
+  items: [anOrderItem()],
+  subtotalCents: 4000,
+  shippingCents: 695,
+  totalCents: 4695,
+  ...overrides,
+});
 
 export const productCard = (overrides = {}) => ({
   id: 1,

@@ -207,6 +207,13 @@ export default function Header() {
           </p>
           <p className="break-all text-sm text-ink-soft">{user.email}</p>
           <div className="mt-3 border-t border-border pt-2">
+            <Link
+              to="/account/orders"
+              onClick={close}
+              className="flex min-h-11 w-full items-center text-sm hover:text-highlight"
+            >
+              My orders
+            </Link>
             <button
               type="button"
               onClick={signOut}
