@@ -16,6 +16,8 @@ API requests for checking the app by hand, and for anyone who clones the repo.
 
 **Sign-in limits:** 10 failed tries per 15 minutes per IP, and per email (a 400 counts as a failed try). The "Accounts" folder fails on purpose 2 times per run, so about 5 runs in 15 minutes lock you out with `429`. The counters live in the server's memory: restart the server (`npm run dev` in `server/`) to reset them, or wait.
 
+**Cart folder:** run it from top to bottom. The first three requests pick two products that are in stock and save their variant ids. "Register a shopper for the bag" creates a new customer every run (register is limited to 10 per hour per IP) and signs in as them, so it replaces the cookie from earlier folders. The folder ends signed out.
+
 Cookies: the sign-in request sets the `token` cookie. Postman keeps it for later requests to `localhost:3002`, so run sign in first. To start over, delete the cookie in Postman's **Cookies** window.
 
 ## Rules (for Claude and for you)

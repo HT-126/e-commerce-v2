@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api.js';
+import { CART_KEY } from '../lib/cart.js';
 import { getMe, login, logout, register } from '../services/auth.js';
+import { useCartStore } from '../stores/cart-store.js';
 
 const ME = ['me'];
 
@@ -10,14 +12,27 @@ const ME = ['me'];
 export const useMe = () => useQuery({ queryKey: ME, queryFn: getMe, staleTime: 60 * 1000, retry: false });
 
 // Signing in or registering puts the user straight into the cache, so the header changes at once.
+// Any bag left in the cache belongs to someone else (a session that ended without a sign out), so it goes.
+function signedIn(queryClient, user) {
+  queryClient.removeQueries({ queryKey: CART_KEY });
+  queryClient.setQueryData(ME, user);
+}
+
 export function useLogin() {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: login, onSuccess: (user) => queryClient.setQueryData(ME, user) });
+  return useMutation({ mutationFn: login, onSuccess: (user) => signedIn(queryClient, user) });
 }
 
 export function useRegister() {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: register, onSuccess: (user) => queryClient.setQueryData(ME, user) });
+  return useMutation({ mutationFn: register, onSuccess: (user) => signedIn(queryClient, user) });
+}
+
+// Signing out empties the bag in the browser. The account bag stays on the server.
+function signedOut(queryClient) {
+  queryClient.setQueryData(ME, null);
+  useCartStore.getState().clear();
+  queryClient.removeQueries({ queryKey: CART_KEY });
 }
 
 // Signed out when the server says so, or when the session was already over (a 401). Any other failure
@@ -26,9 +41,9 @@ export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: logout,
-    onSuccess: () => queryClient.setQueryData(ME, null),
+    onSuccess: () => signedOut(queryClient),
     onError: (error) => {
-      if (error instanceof ApiError && error.status === 401) queryClient.setQueryData(ME, null);
+      if (error instanceof ApiError && error.status === 401) signedOut(queryClient);
     },
   });
 }

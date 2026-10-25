@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLogout, useMe } from '../hooks/use-auth.js';
+import { useCartCount } from '../hooks/use-cart.js';
 import { useCategories } from '../hooks/use-catalog.js';
-import { CloseIcon, MenuIcon, SearchIcon, UserIcon } from './icons.jsx';
+import { BagIcon, CloseIcon, MenuIcon, SearchIcon, UserIcon } from './icons.jsx';
 
 const baseLink = 'rounded-full px-1 py-2 text-sm hover:text-highlight';
 const categoryLink = ({ isActive }) =>
@@ -10,7 +11,6 @@ const categoryLink = ({ isActive }) =>
 const iconButton = 'flex size-11 items-center justify-center rounded-full hover:bg-panel';
 
 // Only one panel is open at a time: 'menu' (phone), 'search' or 'account'.
-// The Bag icon comes with the Cart feature, so there is no dead link yet.
 export default function Header() {
   const [panel, setPanel] = useState(null);
   const headerRef = useRef(null);
@@ -23,6 +23,7 @@ export default function Header() {
   const { data: categories = [] } = useCategories();
   const { data: user, isPending: userLoading } = useMe();
   const logout = useLogout();
+  const bagCount = useCartCount();
 
   const [signOutFailed, setSignOutFailed] = useState(false);
 
@@ -146,6 +147,23 @@ export default function Header() {
               <UserIcon />
             </Link>
           )}
+
+          <Link
+            to="/cart"
+            aria-label={bagCount > 0 ? `Bag, ${bagCount} ${bagCount === 1 ? 'item' : 'items'}` : 'Bag'}
+            onClick={close}
+            className={`${iconButton} relative`}
+          >
+            <BagIcon />
+            {bagCount > 0 && (
+              <span
+                aria-hidden="true"
+                className="absolute top-0.5 right-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-medium text-on-primary"
+              >
+                {bagCount > 99 ? '99+' : bagCount}
+              </span>
+            )}
+          </Link>
 
           <button
             ref={menuButtonRef}

@@ -76,7 +76,18 @@ export async function createProduct({
       })),
     );
   }
-  return { id, slug: slug ?? `product-${n}`, categoryId };
+  // `variants` has the new ids, in the order they were given.
+  const created = await db('variants').where({ product_id: id }).orderBy('position').select('id');
+  return {
+    id,
+    slug: slug ?? `product-${n}`,
+    categoryId,
+    variants: created.map((row) => ({ id: row.id })),
+  };
+}
+
+export async function createCartItem({ user, variantId, quantity = 1 }) {
+  await db('cart_items').insert({ user_id: user.id, variant_id: variantId, quantity });
 }
 
 // A user in the database. The password is hashed with a low cost: tests make many users, and the

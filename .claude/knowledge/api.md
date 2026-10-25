@@ -118,34 +118,41 @@ Creates or updates the signed-in user's review.
 
 The guest cart lives in the browser as a list of `{ variantId, quantity }`. The server never trusts client prices.
 
-`cartLine` = `{ variantId, productSlug, title, color, size, imageUrl, unitPriceCents, quantity, lineTotalCents, status }` where `status` is `ok`, `not_enough` or `sold_out`.
-`cart` = `{ lines: [cartLine], subtotalCents, shippingCents, totalCents, canCheckout }`. Totals count only `ok` lines. `canCheckout` is true when there is at least one line and every line is `ok`.
+`cartLine` = `{ variantId, productSlug, title, color, size, imageUrl, unitPriceCents, quantity, lineTotalCents, status }` where `status` is `ok`, `not_enough` or `sold_out`. `lineTotalCents` is `unitPriceCents * quantity` for every line, whatever its status. Stock numbers are never returned.
+`cart` = `{ lines: [cartLine], subtotalCents, shippingCents, totalCents, canCheckout }`. Totals count only `ok` lines. Shipping is `0` when no line is `ok`. `canCheckout` is true when there is at least one line and every line is `ok`.
+
+Lines come back in the order sent (quote) or the order they were added (account cart). Unknown variants are left out. A variant of an inactive product stays in the cart as `sold_out`. The same `variantId` twice in one request is collapsed to the larger quantity.
 
 ### `POST /api/cart/quote`
-Prices a guest cart.
-- Request: `{ items: [{ variantId, quantity: 1-9 }] }` (up to 50 items)
-- Response `200`: `{ data: cart }`. Unknown variants are left out.
+Prices a guest cart. Public (no sign in).
+- Request: `{ items: [{ variantId, quantity: 1-9 }] }` (0 to 50 items)
+- Response `200`: `{ data: cart }`
+- Errors: `400`
 - Schema: `quoteCartSchema`
 
 ### `GET /api/cart`
 - Auth: required. Response `200`: `{ data: cart }`
+- Errors: `401`
 
 ### `PUT /api/cart/items/:variantId`
 Sets the quantity of one line. Creates it if missing.
 - Auth: required
 - Request: `{ quantity: 1-9 }`
 - Response `200`: `{ data: cart }`
-- Errors: `400`, `404` (variant not found)
-- Schema: `setCartItemSchema`
+- Errors: `400`, `401`, `404` (variant not found, or its product is inactive)
+- Schema: `setCartItemSchema` (body), `cartItemParamsSchema` (params)
 
 ### `DELETE /api/cart/items/:variantId`
-- Auth: required. Response `200`: `{ data: cart }`
+- Auth: required. Response `200`: `{ data: cart }`, also when the line was not in the cart.
+- Errors: `400`, `401`
+- Schema: `cartItemParamsSchema` (params)
 
 ### `POST /api/cart/merge`
 - Auth: required
-- Request: `{ items: [{ variantId, quantity: 1-9 }] }`
+- Request: `{ items: [{ variantId, quantity: 1-9 }] }` (0 to 50 items)
 - Rules: "Guest cart and merge" in `business-rules.md`.
 - Response `200`: `{ data: cart }`
+- Errors: `400`, `401`
 - Schema: `mergeCartSchema`
 
 ## Orders

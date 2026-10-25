@@ -4,6 +4,8 @@ import Button from '../../components/Button.jsx';
 import OptionChip from '../../components/OptionChip.jsx';
 import QuantityStepper from '../../components/QuantityStepper.jsx';
 import { ReturnIcon, RulerIcon, StarIcon, TruckIcon } from '../../components/icons.jsx';
+import { useAddToBag } from '../../hooks/use-cart.js';
+import { MAX_LINES, MAX_QUANTITY } from '../../lib/cart.js';
 import { formatMoney } from '../../lib/format-money.js';
 import { FREE_SHIPPING_FROM_DOLLARS } from '../../lib/shipping.js';
 import ProductGallery from './ProductGallery.jsx';
@@ -25,27 +27,40 @@ export default function ProductView({ product }) {
   const [size, setSize] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [sizeError, setSizeError] = useState(false);
+  // What the last press of "Add to bag" did: `{ capped }` when it worked, 'error' when it did not.
+  const [result, setResult] = useState(null);
+  const addToBagRequest = useAddToBag();
 
   const allSoldOut = !colors.some(colorHasStock);
   const fit = fitText(product);
 
   function chooseColor(next) {
+    setResult(null);
     setColor(next);
     // Keep the size only if this color has it in stock.
     if (size && !hasStock(next, size)) setSize(null);
   }
 
   function chooseSize(next) {
+    setResult(null);
     setSize(next);
     setSizeError(false);
   }
 
-  function addToBag() {
+  async function addToBag() {
+    setResult(null);
     if (!size) {
       setSizeError(true);
       return;
     }
-    // Adding to the bag comes with the Cart feature.
+    const variant = variants.find((v) => v.color === color && v.size === size);
+    if (!variant) return;
+
+    try {
+      setResult(await addToBagRequest.mutateAsync({ variantId: variant.id, quantity }));
+    } catch {
+      setResult('error');
+    }
   }
 
   return (
@@ -115,10 +130,30 @@ export default function ProductView({ product }) {
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <QuantityStepper value={quantity} onChange={setQuantity} />
-          <Button className="flex-1" disabled={allSoldOut} onClick={addToBag}>
+          <Button className="flex-1" disabled={allSoldOut || addToBagRequest.isPending} onClick={addToBag}>
             {allSoldOut ? 'Sold out' : `Add to bag · ${formatMoney(product.priceCents * quantity)}`}
           </Button>
         </div>
+        {result === 'error' && (
+          <p role="alert" className="mt-3 text-sm text-error">
+            Could not add this to your bag. Please try again.
+          </p>
+        )}
+        {result?.full && (
+          <p role="alert" className="mt-3 text-sm text-error">
+            Your bag is full ({MAX_LINES} items max). Remove one to add another.
+          </p>
+        )}
+        {result?.capped !== undefined && (
+          <p role="status" className="mt-3 text-sm">
+            {result.capped
+              ? `Added. Your bag holds at most ${MAX_QUANTITY} of one item.`
+              : 'Added to your bag.'}{' '}
+            <Link to="/cart" className="font-medium underline underline-offset-4">
+              View bag
+            </Link>
+          </p>
+        )}
 
         <ul className="mt-6 space-y-2 border-t border-border pt-6 text-sm text-ink-soft">
           <li className="flex items-center gap-3">

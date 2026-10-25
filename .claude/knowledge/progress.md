@@ -29,3 +29,6 @@ See `decisions.md` (not loaded every session). New decisions go there.
 - "Add to bag" only checks the size (cart is step 4). The Admin link goes to `/admin`, which shows "Page not found" until step 7. The Bag icon and the product page review list come with Cart and Reviews.
 - Dev database: never run `npm run migrate:rollback` with a single batch (it drops every table). Use `npx knex migrate:down` for one step.
 - Rate limit counters live in the API's memory: restart `npm run dev` in `server/` to reset them. Importing the Postman collection again clears its variables (see `postman/README.md`).
+- Cart merge is not atomic: it reads the account quantity, then writes the larger one. A change to the same line from another tab during the merge can be overwritten. Fix later with one raw MySQL upsert (`LEAST(9, GREATEST(...))`).
+- With two tabs open, a tab that still holds the old guest bag can merge it again after the other tab merged and the user lowered a quantity, which raises the line back.
+- Cart accessibility polish: focus is lost after Remove, quantity and remove changes are not announced, and the "Added to your bag" message is not announced by some screen readers.

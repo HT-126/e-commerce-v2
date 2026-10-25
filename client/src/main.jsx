@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
+import CartSync from './components/CartSync.jsx';
 import Layout from './components/Layout.jsx';
+import CartPage from './pages/cart/CartPage.jsx';
 import HomePage from './pages/home/HomePage.jsx';
 import AuthLayout from './pages/auth/AuthLayout.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
@@ -21,6 +23,7 @@ const router = createBrowserRouter([
       { path: '/shop', element: <ShopPage /> },
       { path: '/shop/:category', element: <ShopPage /> },
       { path: '/products/:slug', element: <ProductPage /> },
+      { path: '/cart', element: <CartPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
@@ -46,6 +49,7 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <CartSync />
       <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>,

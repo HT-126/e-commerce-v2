@@ -15,6 +15,7 @@ Exact rules for money, stock, reviews and status. Code must follow these. Do not
 - No shipping address is collected. This is a demo store: no real delivery.
 - Free shipping when the subtotal is `>= 9700` cents ($97.00).
 - Below that: flat `695` cents ($6.95).
+- A cart with no `ok` line (empty, or only sold-out lines) has shipping `0`.
 
 ## Returns
 - "7-day returns" is shown as text only. There is no return flow.
@@ -55,6 +56,7 @@ Stock is counted per variant. Seed values: 10 if the dataset says in stock, 0 if
   - `not_enough`: in stock, but less than the requested quantity. Show "Not enough stock for this quantity. Please lower it." Do not show the number.
   - `sold_out`: stock is 0, or the product is inactive. The line shows disabled. The only action is "Remove".
 - Checkout is blocked while any line is not `ok`.
+- A bag holds at most 50 different lines. "Add to bag" adds no new line when it has 50 (more of an existing line still works).
 
 ## Guest cart and merge
 Guest cart:
@@ -69,7 +71,7 @@ Merge when the user signs in or registers:
 4. Variant that no longer exists: skip it.
 5. Sold-out variants are kept. They show as `sold_out` in the cart.
 6. Sending the same items again changes nothing (because of rule 2), so a retry cannot double the quantities.
-7. After a successful merge, empty the browser cart. If the request fails, keep the browser cart and try again on the next page load.
+7. After a successful merge, empty the browser cart. If the request fails, keep the browser cart and try again on the next page load. Exception: if the server answers `400`, it will never accept this cart (more than 50 lines or a bad value), so empty the browser cart.
 8. On sign out, clear the browser cart. The account cart stays on the server.
 
 ## Accounts

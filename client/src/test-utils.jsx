@@ -45,6 +45,34 @@ export const aUser = (overrides = {}) => ({
   ...overrides,
 });
 
+export const aCartLine = (overrides = {}) => ({
+  variantId: 1,
+  productSlug: 'blue-dress',
+  title: 'Blue Dress',
+  color: 'Blue',
+  size: 'M',
+  imageUrl: 'https://cdn.example/blue.webp',
+  unitPriceCents: 4000,
+  quantity: 1,
+  lineTotalCents: 4000,
+  status: 'ok',
+  ...overrides,
+});
+
+// A cart as the API returns it. Totals are worked out from the `ok` lines, like the server does.
+export const aCart = (lines = []) => {
+  const ok = lines.filter((line) => line.status === 'ok');
+  const subtotalCents = ok.reduce((sum, line) => sum + line.lineTotalCents, 0);
+  const shippingCents = ok.length === 0 || subtotalCents >= 9700 ? 0 : 695;
+  return {
+    lines,
+    subtotalCents,
+    shippingCents,
+    totalCents: subtotalCents + shippingCents,
+    canCheckout: lines.length > 0 && ok.length === lines.length,
+  };
+};
+
 export const productCard = (overrides = {}) => ({
   id: 1,
   slug: 'blue-dress',
