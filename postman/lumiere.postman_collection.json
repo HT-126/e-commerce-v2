@@ -1064,6 +1064,16 @@
           "name": "Login: the demo customer",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const missing = [\"demoEmail\",\"demoPassword\"].filter((name) => !pm.variables.get(name));",
+                  "if (missing.length) throw new Error(\"Not sent. Set the current value of the collection variable(s): \" + missing.join(\", \") + \". Importing the collection again clears them. See postman/README.md.\");"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -1108,6 +1118,16 @@
         {
           "name": "Login: the admin",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const missing = [\"adminEmail\",\"adminPassword\"].filter((name) => !pm.variables.get(name));",
+                  "if (missing.length) throw new Error(\"Not sent. Set the current value of the collection variable(s): \" + missing.join(\", \") + \". Importing the collection again clears them. See postman/README.md.\");"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {

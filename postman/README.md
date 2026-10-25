@@ -12,6 +12,10 @@ API requests for checking the app by hand, and for anyone who clones the repo.
 3. Set the current values of `demoEmail`, `demoPassword`, `adminEmail` and `adminPassword` (collection variables) to the demo user and the admin from your `server/.env`. Do not save real values into the initial value: it is exported with the file.
 4. Run a folder from top to bottom, or use the **Collection Runner** to run it in one go. Each request has a test that checks the status code.
 
+**Importing the collection again clears the current values** of its variables (`demoEmail`, `demoPassword`, `adminEmail`, `adminPassword`). Set them again after every import. The two "Login: the demo customer / the admin" requests do not send when a variable is empty; they stop with a message that names it.
+
+**Sign-in limits:** 10 failed tries per 15 minutes per IP, and per email (a 400 counts as a failed try). The "Accounts" folder fails on purpose 2 times per run, so about 5 runs in 15 minutes lock you out with `429`. The counters live in the server's memory: restart the server (`npm run dev` in `server/`) to reset them, or wait.
+
 Cookies: the sign-in request sets the `token` cookie. Postman keeps it for later requests to `localhost:3002`, so run sign in first. To start over, delete the cookie in Postman's **Cookies** window.
 
 ## Rules (for Claude and for you)
