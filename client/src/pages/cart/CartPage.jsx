@@ -1,9 +1,12 @@
+import { useNavigate } from 'react-router';
 import Button from '../../components/Button.jsx';
 import { useCart, useRemoveLine, useSetQuantity } from '../../hooks/use-cart.js';
+import { usePlaceOrder } from '../../hooks/use-orders.js';
 import { formatMoney } from '../../lib/format-money.js';
 import { FREE_SHIPPING_FROM_CENTS } from '../../lib/shipping.js';
 import { useCartStore } from '../../stores/cart-store.js';
 import CartLine from './CartLine.jsx';
+import { describePayError } from './pay-errors.js';
 
 function CartSkeleton() {
   return (
@@ -26,9 +29,25 @@ function Row({ label, value, strong = false }) {
   );
 }
 
-// Totals count only lines that are `ok`. Paying comes with the next feature (Pay and orders), so a signed-in
-// shopper only sees why checkout is blocked. A guest gets a way to sign in and come back here.
-function Summary({ cart, isGuest }) {
+function PayError({ error }) {
+  const { message, items } = describePayError(error);
+  return (
+    <div role="alert" className="mt-4 text-sm text-error">
+      <p>{message}</p>
+      {items.length > 0 && (
+        <ul className="mt-1 list-disc pl-5">
+          {items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// Totals count only lines that are `ok`. A signed-in shopper pays here; a guest gets a way to sign in
+// and come back to the bag. `pay` is `{ onPay, pending, busy, error }`.
+function Summary({ cart, isGuest, pay }) {
   const { subtotalCents, shippingCents, totalCents, canCheckout } = cart;
   const missingForFree = FREE_SHIPPING_FROM_CENTS - subtotalCents;
 
@@ -53,10 +72,21 @@ function Summary({ cart, isGuest }) {
           Some items are sold out or need a lower quantity. Fix them to check out.
         </p>
       )}
-      {isGuest && (
+      {isGuest ? (
         <Button to="/login" state={{ from: '/cart' }} className="mt-5 w-full min-h-[54px] text-base">
           Sign in to pay
         </Button>
+      ) : (
+        <>
+          <Button
+            className="mt-5 w-full min-h-[54px] text-base"
+            disabled={!canCheckout || pay.pending || pay.busy}
+            onClick={pay.onPay}
+          >
+            {pay.pending ? 'Paying...' : `Pay ${formatMoney(totalCents)}`}
+          </Button>
+          {pay.error && <PayError error={pay.error} />}
+        </>
       )}
     </aside>
   );
@@ -71,9 +101,28 @@ export default function CartPage() {
   const removeLine = useRemoveLine();
   const busy = setQuantity.isPending || removeLine.isPending;
   const changeFailed = setQuantity.isError || removeLine.isError;
+  const placeOrder = usePlaceOrder();
+  const navigate = useNavigate();
 
-  const changeQuantity = (variantId, quantity) => setQuantity.mutate({ variantId, quantity });
-  const remove = (variantId) => removeLine.mutate({ variantId });
+  // Changing the bag answers the message about the last "Pay": it no longer describes this bag.
+  const changeQuantity = (variantId, quantity) => {
+    placeOrder.reset();
+    setQuantity.mutate({ variantId, quantity });
+  };
+  const remove = (variantId) => {
+    placeOrder.reset();
+    removeLine.mutate({ variantId });
+  };
+
+  // A refused order is shown under the button (`placeOrder.error`), so there is nothing to catch here.
+  async function pay() {
+    try {
+      const order = await placeOrder.mutateAsync();
+      navigate(`/orders/${order.orderNumber}`, { state: { placed: true } });
+    } catch {
+      // See above.
+    }
+  }
 
   return (
     <section>
@@ -125,7 +174,11 @@ export default function CartPage() {
                 ))}
               </ul>
             </div>
-            <Summary cart={cart} isGuest={isGuest} />
+            <Summary
+              cart={cart}
+              isGuest={isGuest}
+              pay={{ onPay: pay, pending: placeOrder.isPending, busy, error: placeOrder.error }}
+            />
           </div>
         )}
       </div>

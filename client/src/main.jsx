@@ -5,10 +5,13 @@ import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import CartSync from './components/CartSync.jsx';
 import Layout from './components/Layout.jsx';
+import RequireUser from './components/RequireUser.jsx';
 import CartPage from './pages/cart/CartPage.jsx';
 import HomePage from './pages/home/HomePage.jsx';
 import AuthLayout from './pages/auth/AuthLayout.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
+import OrderPage from './pages/orders/OrderPage.jsx';
+import OrdersPage from './pages/orders/OrdersPage.jsx';
 import ProductPage from './pages/product/ProductPage.jsx';
 import ShopPage from './pages/shop/ShopPage.jsx';
 import './index.css';
@@ -24,6 +27,8 @@ const router = createBrowserRouter([
       { path: '/shop/:category', element: <ShopPage /> },
       { path: '/products/:slug', element: <ProductPage /> },
       { path: '/cart', element: <CartPage /> },
+      { path: '/orders/:orderNumber', element: <RequireUser><OrderPage /></RequireUser> },
+      { path: '/account/orders', element: <RequireUser><OrdersPage /></RequireUser> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

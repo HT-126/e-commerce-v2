@@ -97,6 +97,7 @@ Merge when the user signs in or registers:
 - A customer sees only their own orders.
 - Order number: `LM-` + date `YYMMDD` + `-` + 4 random digits, for example `LM-261025-4821`. Retry if it already exists.
 - Double click on "Pay": the button is disabled while the request runs. (A server-side idempotency key is "later".)
+- Two "Pay" requests from one user at once (a double click, two tabs): the order starts by locking the user's cart rows, so the second request finds an empty cart (`400 CART_EMPTY`) and no second order is made.
 - Never collect or store card data.
 
 ## Ratings and reviews

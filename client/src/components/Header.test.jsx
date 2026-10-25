@@ -247,6 +247,18 @@ describe('Header', () => {
       expect(screen.getAllByRole('link', { name: 'Admin' })).toHaveLength(2);
     });
 
+    it('the Account panel links to My orders, and following it closes the panel', async () => {
+      renderHeader('/', { user: aUser() });
+      fireEvent.click(await screen.findByRole('button', { name: 'Account' }));
+
+      const link = screen.getByRole('link', { name: 'My orders' });
+      expect(link).toHaveAttribute('href', '/account/orders');
+      fireEvent.click(link);
+
+      expect(screen.queryByText('anna@example.com')).not.toBeInTheDocument();
+      expect(where()).toBe('/account/orders');
+    });
+
     it('Sign out sends the request, closes the panel, and the header shows the Sign in link again', async () => {
       const fetchMock = renderHeader('/', { user: aUser() });
       fireEvent.click(await screen.findByRole('button', { name: 'Account' }));
