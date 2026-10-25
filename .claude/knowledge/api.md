@@ -157,23 +157,29 @@ Sets the quantity of one line. Creates it if missing.
 
 ## Orders
 
+`order` = `{ orderNumber, status, createdAt, items: [{ productSlug, title, color, size, imageUrl, unitPriceCents, quantity, lineTotalCents }], subtotalCents, shippingCents, totalCents }`. The items are a copy taken when the order was placed: they never change when the product changes.
+
 ### `POST /api/orders`
 Places an order from the signed-in user's cart. Called by the "Pay" button on the cart page. No address or payment form: the mock payment always succeeds.
 - Auth: required
 - Request: no body
-- Server steps (one transaction): read cart, check every line is `ok`, reduce stock (rules in `business-rules.md`), create order and items with status `paid`, empty the cart.
+- Server steps (one transaction): lock the user's cart rows, read the cart, check every line is `ok`, reduce stock (rules in `business-rules.md`), create order and items with status `paid`, empty the cart.
+- The cart rows are locked first, so two Pay requests from the same user at once cannot both use the same cart: the second one finds it empty and gets `400 CART_EMPTY`.
 - Response `201`: `{ data: order }`
-- Errors: `400 CART_EMPTY`, `400 CART_NOT_READY`, `401`, `409 STOCK_CHANGED` (`details`: `[{ variantId, title, color, size }]`; nothing was changed)
+- Errors: `400 CART_EMPTY`, `400 CART_NOT_READY`, `401`, `409 STOCK_CHANGED` (`details`: `[{ variantId, title, color, size }]` for every line that could not be taken; nothing was changed)
 - Schema: none (no input)
 
 ### `GET /api/orders`
-- Auth: required. Query: `page`, `limit`
-- Response `200`: `{ data: { items: [{ orderNumber, status, createdAt, totalCents, itemCount }], page, limit, total } }`, newest first, own orders only.
+- Auth: required. Query: `page` (default 1, max 10000), `limit` (default 10, max 50)
+- Response `200`: `{ data: { items: [{ orderNumber, status, createdAt, totalCents, itemCount }], page, limit, total } }`, newest first, own orders only. `itemCount` is the total units (the sum of the quantities).
+- Errors: `400`, `401`
+- Schema: `listOrdersSchema` (query)
 
 ### `GET /api/orders/:orderNumber`
-- Auth: required (owner only; another user's order is `404`)
+- Auth: required (owner only; another user's order, or an unknown number, is `404`)
 - Response `200`: `{ data: order }`
-- `order` = `{ orderNumber, status, createdAt, items: [{ productSlug, title, color, size, imageUrl, unitPriceCents, quantity, lineTotalCents }], subtotalCents, shippingCents, totalCents }`
+- Errors: `400`, `401`, `404`
+- Schema: `getOrderSchema` (params)
 
 ## Admin
 Every route here needs `role = 'admin'`. Others get `401` or `403 FORBIDDEN`. Admin routes may return stock numbers.
