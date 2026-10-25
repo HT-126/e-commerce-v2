@@ -166,4 +166,60 @@ describe('ProductView: Add to bag', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(guestItems()).toEqual([]);
   });
+
+  describe('when the bag has 50 different lines', () => {
+    // Variants 100 to 149, one each. `with3` swaps one of them for the variant on this page (id 3).
+    const fullStore = ({ with3 = false } = {}) =>
+      Array.from({ length: 50 }, (_, i) => ({ variantId: with3 && i === 0 ? 3 : 100 + i, quantity: 1 }));
+    const fullServerBag = ({ with3 = false } = {}) =>
+      fullStore({ with3 }).map(({ variantId, quantity }) => aCartLine({ variantId, quantity }));
+
+    it('adds no new line for a guest, and says the bag is full', async () => {
+      useCartStore.setState({ items: fullStore() });
+      renderView();
+      chooseSize('S');
+
+      pressAdd();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Your bag is full (50 items max). Remove one to add another.',
+      );
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(guestItems()).toEqual(fullStore());
+    });
+
+    it('still adds more of a line a guest already has', async () => {
+      useCartStore.setState({ items: fullStore({ with3: true }) });
+      renderView();
+      chooseSize('S');
+
+      pressAdd();
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Added to your bag.');
+      expect(guestItems().find((item) => item.variantId === 3)).toEqual({ variantId: 3, quantity: 2 });
+      expect(guestItems()).toHaveLength(50);
+    });
+
+    it('adds no new line for a signed-in user, and sends nothing', async () => {
+      const fetchMock = renderView({ user: aUser(), serverLines: fullServerBag() });
+      await screen.findByRole('button', { name: /Add to bag/ });
+      chooseSize('S');
+
+      pressAdd();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Your bag is full (50 items max)');
+      expect(calledUrls(fetchMock).filter((url) => url.startsWith('/api/cart/items'))).toEqual([]);
+    });
+
+    it('still adds more of a line a signed-in user already has', async () => {
+      const fetchMock = renderView({ user: aUser(), serverLines: fullServerBag({ with3: true }) });
+      await screen.findByRole('button', { name: /Add to bag/ });
+      chooseSize('S');
+
+      pressAdd();
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Added to your bag.');
+      expect(bodiesSentTo(fetchMock, '/api/cart/items/3')).toEqual([{ quantity: 2 }]);
+    });
+  });
 });

@@ -56,6 +56,7 @@ Stock is counted per variant. Seed values: 10 if the dataset says in stock, 0 if
   - `not_enough`: in stock, but less than the requested quantity. Show "Not enough stock for this quantity. Please lower it." Do not show the number.
   - `sold_out`: stock is 0, or the product is inactive. The line shows disabled. The only action is "Remove".
 - Checkout is blocked while any line is not `ok`.
+- A bag holds at most 50 different lines. "Add to bag" adds no new line when it has 50 (more of an existing line still works).
 
 ## Guest cart and merge
 Guest cart:

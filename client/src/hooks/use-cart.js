@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
-import { CART_KEY, MAX_QUANTITY, addQuantity, countUnits } from '../lib/cart.js';
+import { CART_KEY, MAX_LINES, MAX_QUANTITY, addQuantity, countUnits } from '../lib/cart.js';
 import { getCart, mergeCart, quoteCart, removeCartItem, setCartItem } from '../services/cart.js';
 import { useCartStore } from '../stores/cart-store.js';
 import { useMe } from './use-auth.js';
@@ -51,6 +51,7 @@ export function useCart() {
       cart: account.data,
       isLoading: account.isPending,
       isError: account.isError,
+      error: account.error,
       refetch: account.refetch,
       isGuest: false,
     };
@@ -60,6 +61,7 @@ export function useCart() {
     cart: quote.data && withStoredQuantities(quote.data, items),
     isLoading: quote.isPending,
     isError: quote.isError,
+    error: quote.error,
     refetch: quote.refetch,
     isGuest: true,
   };
@@ -101,6 +103,7 @@ export const useRemoveLine = () =>
   );
 
 // Adds to the quantity already in the bag. Resolves `{ capped }`: true when 9 was the limit.
+// Resolves `{ full: true }` and adds nothing when the bag has 50 lines and this would be a new one.
 export function useAddToBag() {
   const queryClient = useQueryClient();
   const { data: user } = useMe();
@@ -110,6 +113,7 @@ export function useAddToBag() {
       if (!user) {
         const { items, add } = useCartStore.getState();
         const current = items.find((item) => item.variantId === variantId)?.quantity ?? 0;
+        if (current === 0 && items.length >= MAX_LINES) return { full: true };
         add(variantId, quantity);
         return { capped: current + quantity > MAX_QUANTITY };
       }
@@ -117,6 +121,7 @@ export function useAddToBag() {
       // Ask the server for the quantity now, because the bag may have changed in another tab.
       const cart = await queryClient.fetchQuery({ queryKey: CART_KEY, queryFn: getCart, staleTime: 0 });
       const current = cart.lines.find((line) => line.variantId === variantId)?.quantity ?? 0;
+      if (current === 0 && cart.lines.length >= MAX_LINES) return { full: true };
       queryClient.setQueryData(CART_KEY, await setCartItem(variantId, addQuantity(current, quantity)));
       return { capped: current + quantity > MAX_QUANTITY };
     },

@@ -7,6 +7,7 @@ import CartPage from './CartPage.jsx';
 
 const signedOut = { status: 401, body: { error: { message: 'Please sign in', code: 'UNAUTHORIZED' } } };
 const failure = { status: 500, body: { error: { message: 'Something went wrong' } } };
+const invalid = { status: 400, body: { error: { message: 'Invalid input', code: 'VALIDATION_ERROR' } } };
 
 // The line the server would return for a variant. `overrides[variantId]` changes one line (a status, a price).
 const lineFor = (variantId, quantity, overrides = {}) =>
@@ -21,10 +22,12 @@ const lineFor = (variantId, quantity, overrides = {}) =>
 // A fake API with a bag that changes, like the real one.
 // `user` null: a guest, whose bag is the store and is priced by the quote.
 // `bag`: a signed-in user's lines. `overrides`: per-variant changes to the lines. `fail`: URLs that answer 500.
-function renderCart({ user = null, bag = [], overrides = {}, fail = [] } = {}) {
+// `refuse`: URLs that answer 400, like the quote does for a bag it cannot accept.
+function renderCart({ user = null, bag = [], overrides = {}, fail = [], refuse = [] } = {}) {
   let account = [...bag];
   const fetchMock = stubApi((url, init) => {
     if (fail.includes(url)) return failure;
+    if (refuse.includes(url)) return invalid;
     if (url === '/api/auth/me') return user ? { body: { data: { user } } } : signedOut;
     if (url === '/api/cart/quote') {
       const { items } = JSON.parse(init.body);
@@ -273,5 +276,27 @@ describe('CartPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your bag.');
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('offers "Clear bag" next to "Try again" when the server refuses the browser bag, and empties it', async () => {
+    guestBag({ variantId: 1, quantity: 1 }, { variantId: 2, quantity: 0 });
+    renderCart({ refuse: ['/api/cart/quote'] });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your bag.');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear bag' }));
+
+    expect(await screen.findByText('Your bag is empty.')).toBeInTheDocument();
+    expect(useCartStore.getState().items).toEqual([]);
+  });
+
+  it('offers no "Clear bag" when a guest bag fails for another reason (the server is down)', async () => {
+    guestBag({ variantId: 1, quantity: 1 });
+    renderCart({ fail: ['/api/cart/quote'] });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your bag.');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear bag' })).not.toBeInTheDocument();
+    expect(useCartStore.getState().items).toHaveLength(1);
   });
 });

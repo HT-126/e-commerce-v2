@@ -2,6 +2,7 @@ import Button from '../../components/Button.jsx';
 import { useCart, useRemoveLine, useSetQuantity } from '../../hooks/use-cart.js';
 import { formatMoney } from '../../lib/format-money.js';
 import { FREE_SHIPPING_FROM_CENTS } from '../../lib/shipping.js';
+import { useCartStore } from '../../stores/cart-store.js';
 import CartLine from './CartLine.jsx';
 
 function CartSkeleton() {
@@ -62,7 +63,10 @@ function Summary({ cart, isGuest }) {
 }
 
 export default function CartPage() {
-  const { cart, isLoading, isError, refetch, isGuest } = useCart();
+  const { cart, isLoading, isError, error, refetch, isGuest } = useCart();
+  const clearBag = useCartStore((state) => state.clear);
+  // The server refuses the browser bag (400): too many lines or a bad value. Trying again cannot help.
+  const bagIsInvalid = isGuest && error?.status === 400;
   const setQuantity = useSetQuantity();
   const removeLine = useRemoveLine();
   const busy = setQuantity.isPending || removeLine.isPending;
@@ -83,9 +87,16 @@ export default function CartPage() {
         ) : isError ? (
           <div role="alert" className="rounded-[28px] bg-card p-8 text-center">
             <p className="text-error">Could not load your bag.</p>
-            <Button variant="outline" className="mt-4" onClick={() => refetch()}>
-              Try again
-            </Button>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              <Button variant="outline" onClick={() => refetch()}>
+                Try again
+              </Button>
+              {bagIsInvalid && (
+                <Button variant="outline" onClick={clearBag}>
+                  Clear bag
+                </Button>
+              )}
+            </div>
           </div>
         ) : cart.lines.length === 0 ? (
           <div className="rounded-[28px] bg-card p-8 text-center">

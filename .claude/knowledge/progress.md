@@ -30,6 +30,5 @@ See `decisions.md` (not loaded every session). New decisions go there.
 - Dev database: never run `npm run migrate:rollback` with a single batch (it drops every table). Use `npx knex migrate:down` for one step.
 - Rate limit counters live in the API's memory: restart `npm run dev` in `server/` to reset them. Importing the Postman collection again clears its variables (see `postman/README.md`).
 - Cart merge is not atomic: it reads the account quantity, then writes the larger one. A change to the same line from another tab during the merge can be overwritten. Fix later with one raw MySQL upsert (`LEAST(9, GREATEST(...))`).
-- A corrupt browser bag (more than 50 distinct items, or a hand-edited quantity) makes `quote` and `merge` answer `400`, so `/cart` stays on "Could not load your bag" and the bag cannot be merged.
 - With two tabs open, a tab that still holds the old guest bag can merge it again after the other tab merged and the user lowered a quantity, which raises the line back.
 - Cart accessibility polish: focus is lost after Remove, quantity and remove changes are not announced, and the "Added to your bag" message is not announced by some screen readers.

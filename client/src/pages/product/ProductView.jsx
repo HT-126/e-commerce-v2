@@ -5,7 +5,7 @@ import OptionChip from '../../components/OptionChip.jsx';
 import QuantityStepper from '../../components/QuantityStepper.jsx';
 import { ReturnIcon, RulerIcon, StarIcon, TruckIcon } from '../../components/icons.jsx';
 import { useAddToBag } from '../../hooks/use-cart.js';
-import { MAX_QUANTITY } from '../../lib/cart.js';
+import { MAX_LINES, MAX_QUANTITY } from '../../lib/cart.js';
 import { formatMoney } from '../../lib/format-money.js';
 import { FREE_SHIPPING_FROM_DOLLARS } from '../../lib/shipping.js';
 import ProductGallery from './ProductGallery.jsx';
@@ -137,6 +137,11 @@ export default function ProductView({ product }) {
         {result === 'error' && (
           <p role="alert" className="mt-3 text-sm text-error">
             Could not add this to your bag. Please try again.
+          </p>
+        )}
+        {result?.full && (
+          <p role="alert" className="mt-3 text-sm text-error">
+            Your bag is full ({MAX_LINES} items max). Remove one to add another.
           </p>
         )}
         {result?.capped !== undefined && (
