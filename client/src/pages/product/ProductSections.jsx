@@ -79,16 +79,16 @@ export function SizeChartSection({ sizeChart, className = '' }) {
         <table className="w-full min-w-max text-left text-sm">
           <thead>
             <tr className="border-b-2 border-ink">
-              {sizeChart.headers.map((header) => (
-                <th key={header} scope="col" className="py-2 pr-6 font-medium">
+              {sizeChart.headers.map((header, i) => (
+                <th key={i} scope="col" className="py-2 pr-6 font-medium">
                   {header}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {sizeChart.rows.map((row) => (
-              <tr key={row.join('|')} className="border-b border-border">
+            {sizeChart.rows.map((row, r) => (
+              <tr key={r} className="border-b border-border">
                 {row.map((cell, i) => (
                   <td key={i} className={`py-2.5 pr-6 ${i === 0 ? 'font-medium' : ''}`}>
                     {cell}

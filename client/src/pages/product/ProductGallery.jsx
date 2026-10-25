@@ -15,7 +15,7 @@ export default function ProductGallery({ images, title }) {
               <button
                 type="button"
                 aria-label={`Show photo ${i + 1}`}
-                aria-current={i === index}
+                aria-pressed={i === index}
                 onClick={() => setIndex(i)}
                 className={`block size-16 overflow-hidden rounded-xl border-2 bg-card md:size-20 ${
                   i === index ? 'border-primary' : 'border-transparent'

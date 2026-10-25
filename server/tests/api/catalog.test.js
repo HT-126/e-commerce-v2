@@ -98,6 +98,15 @@ describe('GET /api/products', () => {
       expect(slugs(await get('/api/products?sort=newest'))).toEqual(['new', 'old']);
     });
 
+    it('newest: products with the same creation time are ordered by id, newest id first', async () => {
+      const sameTime = new Date('2026-01-01T10:00:00Z');
+      await createProduct({ slug: 'first', createdAt: sameTime });
+      await createProduct({ slug: 'second', createdAt: sameTime });
+      await createProduct({ slug: 'third', createdAt: sameTime });
+
+      expect(slugs(await get('/api/products?sort=newest'))).toEqual(['third', 'second', 'first']);
+    });
+
     it('rating: highest first, more reviews win a tie, no rating last', async () => {
       await createProduct({ slug: 'unrated' });
       await createProduct({ slug: 'four', ratingAvg: 4.0, reviewCount: 3 });
@@ -194,7 +203,8 @@ describe('GET /api/products', () => {
       const one = await get('/api/products?sort=price_asc&limit=2&page=1');
       const two = await get('/api/products?sort=price_asc&limit=2&page=2');
 
-      expect(new Set([...slugs(one), ...slugs(two)]).size).toBe(4);
+      // Same price: the id tie-break gives one fixed order, so no product repeats or goes missing.
+      expect([...slugs(one), ...slugs(two)]).toEqual(['same1', 'same2', 'same3', 'same4']);
     });
   });
 
@@ -204,6 +214,7 @@ describe('GET /api/products', () => {
       ['limit 0', 'limit=0'],
       ['page 0', 'page=0'],
       ['page not a number', 'page=abc'],
+      ['page above the maximum', 'page=10001'],
       ['unknown sort', 'sort=cheapest'],
       ['negative price', 'maxPriceCents=-1'],
       ['search longer than 100 characters', `q=${'a'.repeat(101)}`],

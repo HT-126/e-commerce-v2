@@ -108,6 +108,90 @@ describe('ShopPage', () => {
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
   });
 
+  it('ignores URL values the API would reject, instead of showing an error', async () => {
+    const fetchMock = renderShop('/shop?sort=foo&maxPriceCents=abc&page=1.5');
+
+    expect(await screen.findByRole('link', { name: /Blue Dress/ })).toBeInTheDocument();
+
+    expect(calledUrls(fetchMock)).toContain('/api/products?sort=newest&page=1&limit=12');
+    expect(screen.getByLabelText('Price')).toHaveValue('');
+    expect(screen.getByLabelText('Sort by')).toHaveValue('newest');
+  });
+
+  it('ignores a price in the URL that is not one of the choices', async () => {
+    const fetchMock = renderShop('/shop?maxPriceCents=3000');
+
+    await screen.findByLabelText('Price');
+
+    expect(screen.getByLabelText('Price')).toHaveValue('');
+    expect(calledUrls(fetchMock).every((url) => !url.includes('maxPriceCents'))).toBe(true);
+  });
+
+  it('cuts a search that is too long, so the API does not answer 400', async () => {
+    const fetchMock = renderShop(`/shop?q=${'a'.repeat(150)}`);
+
+    await screen.findByLabelText('Search by title');
+
+    expect(calledUrls(fetchMock)).toContain(`/api/products?sort=newest&q=${'a'.repeat(100)}&page=1&limit=12`);
+  });
+
+  it('gives a way back from a page past the end', async () => {
+    const fetchMock = renderShop('/shop?page=99', { items: [], total: 30 });
+
+    expect(await screen.findByText('Page 99 of 3')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+
+    await vi.waitFor(() =>
+      expect(calledUrls(fetchMock)).toContain('/api/products?sort=newest&page=3&limit=12'),
+    );
+  });
+
+  it('does not show the old list under a new filter', async () => {
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (url.startsWith('/api/categories')) return Response.json({ data: categories });
+        if (url.includes('sort=rating')) await gate;
+        const title = url.includes('sort=rating') ? 'Top Pick' : 'Blue Dress';
+        return Response.json({ data: { items: [productCard({ title })], page: 1, limit: 12, total: 1 } });
+      }),
+    );
+    renderRoute(<ShopPage />, { path: '/shop/:category?', url: '/shop' });
+    await screen.findByRole('link', { name: /Blue Dress/ });
+
+    fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'rating' } });
+
+    expect(await screen.findByRole('status', { name: 'Loading products' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Blue Dress/ })).not.toBeInTheDocument();
+    release();
+    expect(await screen.findByRole('link', { name: /Top Pick/ })).toBeInTheDocument();
+  });
+
+  it('keeps the current page visible while the next page loads', async () => {
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (url.startsWith('/api/categories')) return Response.json({ data: categories });
+        if (url.includes('page=2')) await gate;
+        const title = url.includes('page=2') ? 'Page Two Dress' : 'Blue Dress';
+        return Response.json({ data: { items: [productCard({ title })], page: 1, limit: 12, total: 30 } });
+      }),
+    );
+    renderRoute(<ShopPage />, { path: '/shop/:category?', url: '/shop' });
+    await screen.findByRole('link', { name: /Blue Dress/ });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    await vi.waitFor(() => expect(document.querySelector('[aria-busy="true"]')).not.toBeNull());
+    expect(screen.getByRole('link', { name: /Blue Dress/ })).toBeInTheDocument();
+    release();
+    expect(await screen.findByRole('link', { name: /Page Two Dress/ })).toBeInTheDocument();
+  });
+
   it('shows an error with a retry button when the server fails', async () => {
     stubApi((url) =>
       url.startsWith('/api/categories')
@@ -117,5 +201,21 @@ describe('ShopPage', () => {
     renderRoute(<ShopPage />, { path: '/shop/:category?', url: '/shop' });
 
     expect(await screen.findByText('Could not load the products.')).toBeInTheDocument();
+  });
+
+  it('loads the list again when Try again is pressed', async () => {
+    let productCalls = 0;
+    stubApi((url) => {
+      if (url.startsWith('/api/categories')) return { body: { data: categories } };
+      productCalls += 1;
+      return productCalls === 1
+        ? { status: 500, body: { error: { message: 'Something went wrong' } } }
+        : { body: { data: { items: [productCard()], page: 1, limit: 12, total: 1 } } };
+    });
+    renderRoute(<ShopPage />, { path: '/shop/:category?', url: '/shop' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByRole('link', { name: /Blue Dress/ })).toBeInTheDocument();
   });
 });

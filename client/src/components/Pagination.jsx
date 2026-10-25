@@ -1,7 +1,7 @@
 import Button from './Button.jsx';
 
 export default function Pagination({ page, totalPages, onChange }) {
-  if (totalPages <= 1) return null;
+  if (totalPages <= 1 && page <= 1) return null;
 
   return (
     <nav aria-label="Pagination" className="mt-10 flex items-center justify-center gap-4">

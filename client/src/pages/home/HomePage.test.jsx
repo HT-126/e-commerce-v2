@@ -25,6 +25,23 @@ describe('HomePage', () => {
     expect(screen.getByRole('link', { name: 'Shop all' })).toHaveAttribute('href', '/shop');
   });
 
+  it('marks the open list with aria-pressed', async () => {
+    renderHome();
+    await screen.findAllByRole('link', { name: /Blue Dress/ });
+
+    expect(screen.getByRole('button', { name: 'New arrivals' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Top rated' }));
+
+    expect(screen.getByRole('button', { name: 'Top rated' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'New arrivals' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('shows the shipping promise as "$97 or more", matching the rule', async () => {
+    renderHome();
+
+    expect(await screen.findByText('On every order of $97 or more')).toBeInTheDocument();
+  });
+
   it('does not claim a rating that the data cannot back up', () => {
     renderHome();
 
@@ -35,10 +52,10 @@ describe('HomePage', () => {
     const fetchMock = renderHome();
     await screen.findAllByRole('link', { name: /Blue Dress/ });
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Top rated' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Top rated' }));
     expect(await screen.findByRole('link', { name: /Top Pick/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Under $45' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Under $45' }));
     await vi.waitFor(() =>
       expect(calledUrls(fetchMock)).toContain('/api/products?maxPriceCents=4499&limit=8'),
     );

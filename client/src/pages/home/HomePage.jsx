@@ -4,6 +4,7 @@ import Button from '../../components/Button.jsx';
 import ProductGrid from '../../components/ProductGrid.jsx';
 import { ReturnIcon, RulerIcon, TruckIcon } from '../../components/icons.jsx';
 import { useProducts } from '../../hooks/use-catalog.js';
+import { FREE_SHIPPING_FROM_DOLLARS } from '../../lib/shipping.js';
 
 // Tabs from api.md. Under $45 = up to 4499 cents.
 const TABS = [
@@ -13,15 +14,19 @@ const TABS = [
 ];
 
 const PROMISES = [
-  { Icon: TruckIcon, title: 'Free US shipping', text: 'On every order over $97' },
+  {
+    Icon: TruckIcon,
+    title: 'Free US shipping',
+    text: `On every order of $${FREE_SHIPPING_FROM_DOLLARS} or more`,
+  },
   { Icon: ReturnIcon, title: '7-day returns', text: 'Not the right fit? Send it back.' },
-  { Icon: RulerIcon, title: 'Size charts', text: 'Measurements in inches, on most pieces' },
+  { Icon: RulerIcon, title: 'Size charts', text: 'Measurements in inches, on the product page' },
 ];
 
 function Hero() {
   // Same query as the first tab, so it is already cached.
-  const { data } = useProducts(TABS[0].params);
-  const photos = data?.items.slice(0, 3) ?? [];
+  const { data, isPending } = useProducts(TABS[0].params);
+  const photos = data?.items.filter((product) => product.imageUrl).slice(0, 3) ?? [];
 
   return (
     <section className="grid items-center gap-8 rounded-[36px] bg-panel p-8 md:grid-cols-2 md:p-12">
@@ -40,6 +45,14 @@ function Hero() {
         </div>
       </div>
 
+      {/* Space is reserved while loading, so the headline does not jump when the photos arrive. */}
+      {isPending && (
+        <div className="grid grid-cols-3 gap-3" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="aspect-[3/5] animate-pulse rounded-t-full bg-card" />
+          ))}
+        </div>
+      )}
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           {photos.map((product) => (
@@ -85,13 +98,12 @@ function ProductTabs() {
         Dressed up, dressed down, <span className="italic text-highlight">dressed for you.</span>
       </h2>
 
-      <div role="tablist" aria-label="Product lists" className="mt-6 flex flex-wrap justify-center gap-2">
+      <div role="group" aria-label="Product lists" className="mt-6 flex flex-wrap justify-center gap-2">
         {TABS.map((tab, index) => (
           <button
             key={tab.label}
             type="button"
-            role="tab"
-            aria-selected={index === active}
+            aria-pressed={index === active}
             onClick={() => setActive(index)}
             className={`min-h-11 rounded-full border px-5 text-sm ${
               index === active
@@ -104,7 +116,7 @@ function ProductTabs() {
         ))}
       </div>
 
-      <div className="mt-8" role="tabpanel">
+      <div className="mt-8">
         <ProductGrid items={data?.items} isPending={isPending} isError={isError} onRetry={refetch} />
       </div>
 

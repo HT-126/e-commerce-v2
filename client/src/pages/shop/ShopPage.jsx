@@ -22,6 +22,18 @@ const PRICES = [
   { value: '7499', label: 'Under $75' },
 ];
 
+// Same limits as the API schema. Anyone can type anything in the URL, so a value the API would
+// reject falls back to the default instead of showing an error that Retry can never fix.
+const MAX_PAGE = 10000;
+const MAX_QUERY_LENGTH = 100;
+const SORT_VALUES = SORTS.map((s) => s.value);
+const PRICE_VALUES = PRICES.map((p) => p.value);
+
+function readPage(value) {
+  const page = Number(value);
+  return Number.isInteger(page) && page >= 1 && page <= MAX_PAGE ? page : 1;
+}
+
 const fieldClass = 'min-h-11 rounded-full border border-border bg-white px-4 text-sm';
 
 export default function ShopPage() {
@@ -29,10 +41,12 @@ export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const categories = useCategories();
 
-  const sort = searchParams.get('sort') ?? 'newest';
-  const maxPriceCents = searchParams.get('maxPriceCents') ?? '';
-  const q = searchParams.get('q') ?? '';
-  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  const sortParam = searchParams.get('sort');
+  const priceParam = searchParams.get('maxPriceCents');
+  const sort = SORT_VALUES.includes(sortParam) ? sortParam : 'newest';
+  const maxPriceCents = PRICE_VALUES.includes(priceParam) ? priceParam : '';
+  const q = (searchParams.get('q') ?? '').trim().slice(0, MAX_QUERY_LENGTH);
+  const page = readPage(searchParams.get('page'));
 
   const products = useProducts(
     { category, sort, maxPriceCents, q, page, limit: LIMIT },
@@ -115,7 +129,11 @@ export default function ShopPage() {
         </select>
       </div>
 
-      <div className="mt-8">
+      {/* While the next page loads, the current one stays visible but dimmed. */}
+      <div
+        className={`mt-8 transition-opacity ${products.isPlaceholderData ? 'opacity-60' : ''}`}
+        aria-busy={products.isPlaceholderData}
+      >
         <ProductGrid
           items={products.data?.items}
           isPending={products.isPending}
@@ -126,7 +144,12 @@ export default function ShopPage() {
         />
       </div>
 
-      <Pagination page={page} totalPages={totalPages} onChange={(next) => update({ page: String(next) })} />
+      {/* A page past the end (typed in the URL) still gets a way back: Previous jumps to the last page. */}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onChange={(next) => update({ page: String(Math.min(next, Math.max(totalPages, 1))) })}
+      />
     </section>
   );
 }

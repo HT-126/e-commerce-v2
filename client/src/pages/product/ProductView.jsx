@@ -5,6 +5,7 @@ import OptionChip from '../../components/OptionChip.jsx';
 import QuantityStepper from '../../components/QuantityStepper.jsx';
 import { ReturnIcon, RulerIcon, StarIcon, TruckIcon } from '../../components/icons.jsx';
 import { formatMoney } from '../../lib/format-money.js';
+import { FREE_SHIPPING_FROM_DOLLARS } from '../../lib/shipping.js';
 import ProductGallery from './ProductGallery.jsx';
 
 // Fit text from `sizingNotes`, else `fit` and `length` (business-rules.md).
@@ -121,7 +122,8 @@ export default function ProductView({ product }) {
 
         <ul className="mt-6 space-y-2 border-t border-border pt-6 text-sm text-ink-soft">
           <li className="flex items-center gap-3">
-            <TruckIcon className="size-4 shrink-0" /> Free US shipping over $97
+            <TruckIcon className="size-4 shrink-0" /> Free US shipping on orders of $
+            {FREE_SHIPPING_FROM_DOLLARS} or more
           </li>
           <li className="flex items-center gap-3">
             <ReturnIcon className="size-4 shrink-0" /> 7-day returns

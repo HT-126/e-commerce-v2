@@ -25,9 +25,9 @@ export default function ProductCard({ product }) {
           </span>
         )}
       </div>
-      <h3 className="mt-3 line-clamp-2 min-h-[2.75rem] px-2 text-center font-serif text-base leading-snug">
+      <p className="mt-3 line-clamp-2 min-h-[2.75rem] px-2 text-center font-serif text-base leading-snug">
         {title}
-      </h3>
+      </p>
       <p className="mt-1 px-2 pb-1 text-center text-sm text-ink-soft">
         {formatMoney(priceCents)}
         {ratingAvg !== null && ` · ${ratingAvg.toFixed(1)} ★ (${reviewCount})`}

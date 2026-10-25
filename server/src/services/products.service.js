@@ -21,9 +21,12 @@ function toCard(row) {
   };
 }
 
+// Customers only ever see active products, so every query starts from here.
+const activeProducts = () => db('products').where('products.is_active', true);
+
 // Product cards with the main photo (position 0) and a sold-out flag.
 function cardQuery() {
-  return db('products')
+  return activeProducts()
     .leftJoin('product_images', function () {
       this.on('product_images.product_id', 'products.id').andOnVal('product_images.position', '=', 0);
     })
@@ -43,7 +46,6 @@ function cardQuery() {
 }
 
 function applyFilters(query, { category, maxPriceCents, q }) {
-  query.where('products.is_active', true);
   if (category) {
     query.whereIn('products.category_id', db('categories').select('id').where({ slug: category }));
   }
@@ -53,7 +55,7 @@ function applyFilters(query, { category, maxPriceCents, q }) {
 }
 
 export async function listProducts({ sort, page, limit, ...filters }) {
-  const [{ total }] = await applyFilters(db('products'), filters).count({ total: '*' });
+  const [{ total }] = await applyFilters(activeProducts(), filters).count({ total: '*' });
   const rows = await applyFilters(cardQuery(), filters)
     .orderBy(productOrder(sort))
     .limit(limit)
@@ -117,7 +119,6 @@ export async function getProduct(slug) {
 export async function listRelated(slug) {
   const product = await findActiveProduct(slug);
   const rows = await cardQuery()
-    .where('products.is_active', true)
     .where('products.category_id', product.category_id)
     .whereNot('products.id', product.id)
     .orderBy(productOrder('newest'))

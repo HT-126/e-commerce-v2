@@ -64,6 +64,11 @@ describe('listProductsSchema', () => {
     });
   });
 
+  it('rejects a page above 10000', () => {
+    expect(listProductsSchema.safeParse({ page: '10000' }).success).toBe(true);
+    expect(listProductsSchema.safeParse({ page: '10001' }).success).toBe(false);
+  });
+
   it('rejects a limit above 48', () => {
     expect(listProductsSchema.safeParse({ limit: '49' }).success).toBe(false);
   });
