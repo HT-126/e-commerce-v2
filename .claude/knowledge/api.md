@@ -23,6 +23,7 @@ Money is always integer cents. Dates are ISO 8601 strings. Customer routes never
 | 409 | `EMAIL_TAKEN` | Register with an email that exists |
 | 409 | `SLUG_TAKEN` | Admin creates or renames a product to a slug that exists |
 | 409 | `SKU_TAKEN` | Admin creates a variant with a SKU that exists |
+| 409 | `VARIANT_TAKEN` | Admin gives a product two variants with the same color and size |
 | 409 | `STOCK_CHANGED` | Not enough stock at order time. `details` lists the lines |
 | 429 | `RATE_LIMITED` | Too many requests. Limits are in `business-rules.md` (Accounts). Response has `RateLimit` headers |
 
@@ -190,27 +191,31 @@ Places an order from the signed-in user's cart. Called by the "Pay" button on th
 - Schema: `getOrderSchema` (params)
 
 ## Admin
-Every route here needs `role = 'admin'`. Others get `401` or `403 FORBIDDEN`. Admin routes may return stock numbers.
+Every route here needs `role = 'admin'`: signed out is `401 UNAUTHORIZED`, a customer is `403 FORBIDDEN`. One check on the whole `/api/admin` path, so no route can miss it. Admin routes may return stock numbers.
+
+`adminVariant` = `{ id, sku, color, size, position, stock }`.
+`adminProduct` = `{ id, slug, title, description, highlights: [string], stylingNote, categoryId, category: { name, slug }, priceCents, isActive, material, care, fit, length, closure, season, pattern, sizingNotes, ratingAvg, reviewCount, images: [{ url, alt }], variants: [adminVariant] }`. The size chart is not part of it (not editable in the MVP).
+`adminOrder` = the `order` of the Orders section plus `email`, `customer: { id, firstName, lastName }` and `allowedStatuses: [status]`, the statuses the order may change to now (`business-rules.md`), so a screen shows only valid buttons.
 
 ### Products
-- `GET /api/admin/products` — Query: `q`, `category`, `active` (`true`|`false`), `sort` (`newest` | `title` | `price_asc` | `price_desc`, default `newest`), `page`, `limit` (default 20, max 100). Response: `{ data: { items: [{ id, slug, title, category, priceCents, isActive, variantCount, totalStock, imageUrl }], page, limit, total } }`. Schema: `adminListProductsSchema`
-- `GET /api/admin/products/:id` — full product with `images` and `variants: [{ id, sku, color, size, position, stock }]`
-- `POST /api/admin/products` — Request: `{ title, slug, description?, highlights?, stylingNote?, categoryId, priceCents, isActive, material?, care?, fit?, length?, closure?, season?, pattern?, sizingNotes?, images: [{ url, alt }] }` (size chart is not editable in the MVP) (at least 1 image). Response `201`. Errors: `400`, `409 SLUG_TAKEN`. Schema: `createProductSchema`
-- `PATCH /api/admin/products/:id` — same fields, all optional. `images`, when sent, replaces the whole list. Errors: `400`, `404`, `409 SLUG_TAKEN`. Schema: `updateProductSchema`
-- There is no DELETE. Set `isActive: false` instead.
+- `GET /api/admin/products` — Query: `q` (title contains), `category` (slug), `active` (`true`|`false`), `sort` (`newest` | `title` | `price_asc` | `price_desc`, default `newest`), `page` (default 1, max 10000), `limit` (default 20, max 100). Response: `{ data: { items: [{ id, slug, title, category: { name, slug }, priceCents, isActive, variantCount, totalStock, imageUrl }], page, limit, total } }`. Inactive products are included. Schema: `adminListProductsSchema`
+- `GET /api/admin/products/:id` — `{ data: adminProduct }`. Errors: `400`, `404`. Schema: `adminProductParamsSchema`
+- `POST /api/admin/products` — Request: `{ title (1-200), slug (lower case letters, digits and single dashes, up to 160), description? (up to 5000), highlights? (up to 20 lines of 1-200 characters), stylingNote? (up to 1000), categoryId, priceCents (whole number from 1 to 10,000,000, that is $0.01 to $100,000.00), isActive, material? (up to 120), care? (up to 255), fit? (up to 40), length? (up to 40), closure? (up to 60), season? (up to 40), pattern? (up to 60), sizingNotes? (up to 2000), images: [{ url (http or https, up to 500), alt? (up to 255) }] }` (1 to 10 images). Text is trimmed, and an empty optional text is saved as null. A product starts with no variants. Response `201`: `{ data: adminProduct }`. Errors: `400` (also an unknown `categoryId`), `409 SLUG_TAKEN`. Schema: `createProductSchema`
+- `PATCH /api/admin/products/:id` — same fields and limits, all optional, at least one. (The admin screen locks the slug of an existing product, because old orders link to it; the API still accepts a new one.) `images`, when sent, replaces the whole list in one transaction. Response `200`: `{ data: adminProduct }`. Errors: `400`, `404`, `409 SLUG_TAKEN`. Schema: `updateProductSchema`
+- There is no DELETE. Set `isActive: false` instead: the product leaves the shop (its page is `404`) and stays in old orders.
 
 ### Variants
-- `POST /api/admin/products/:id/variants` — Request: `{ sku, color, size, stock }`. Response `201`. Errors: `400`, `409 SKU_TAKEN`, `409` on duplicate color and size. Schema: `createVariantSchema`
-- `PATCH /api/admin/variants/:id` — Request: `{ stock?, color?, size? }` (`stock` is an integer 0 or more). Schema: `updateVariantSchema`
+- `POST /api/admin/products/:id/variants` — Request: `{ sku (1-40), color (1-60), size (1-20), stock (whole number from 0 to 1,000,000) }`. The color group is worked out from the color, and the variant goes last in the display order. Response `201`: `{ data: adminVariant }`. Errors: `400`, `404` (product), `409 SKU_TAKEN`, `409 VARIANT_TAKEN`. Schema: `createVariantSchema`
+- `PATCH /api/admin/variants/:id` — Request: `{ stock?, color?, size? }`, at least one (`stock` is a whole number from 0 to 1,000,000; color and size have the same limits as when a variant is created; a changed color gets its color group again). Response `200`: `{ data: adminVariant }`. Errors: `400` (also a negative or fractional stock), `404`, `409 VARIANT_TAKEN`. Schema: `updateVariantSchema`
 
 ### Orders
-- `GET /api/admin/orders` — Query: `status`, `q` (order number or email), `sort` (`newest` | `oldest` | `total_desc`, default `newest`), `page`, `limit` (default 20, max 100). Response: `{ data: { items: [{ orderNumber, status, createdAt, email, totalCents, itemCount }], page, limit, total } }`
-- `GET /api/admin/orders/:orderNumber` — the order plus `email` and `customer: { id, firstName, lastName }`
-- `PATCH /api/admin/orders/:orderNumber` — Request: `{ status }`. Allowed changes are in `business-rules.md`. Cancelling restocks in the same transaction. Errors: `400 INVALID_STATUS_CHANGE`, `404`. Schema: `updateOrderStatusSchema`
+- `GET /api/admin/orders` — Query: `status`, `q` (order number or email contains), `sort` (`newest` | `oldest` | `total_desc`, default `newest`), `page`, `limit` (default 20, max 100). Response: `{ data: { items: [{ orderNumber, status, createdAt, email, totalCents, itemCount }], page, limit, total } }` (`itemCount` is the total units). Schema: `adminListOrdersSchema`
+- `GET /api/admin/orders/:orderNumber` — `{ data: adminOrder }`. Errors: `400`, `404`.
+- `PATCH /api/admin/orders/:orderNumber` — Request: `{ status }`. Allowed changes are in `business-rules.md`. The order row is locked first, so two requests at once cannot both restock. Cancelling restocks every line in the same transaction. Response `200`: `{ data: adminOrder }`. Errors: `400 INVALID_STATUS_CHANGE` (also the same status), `404`. Schema: `updateOrderStatusSchema`
 
 ### Reviews
-- `GET /api/admin/reviews` — Query: `productId`, `page`, `limit`. Response: list with `{ id, rating, comment, createdAt, product: { slug, title }, user: { email } }`
-- `DELETE /api/admin/reviews/:id` — Response `204`. Recomputes the product rating.
+- `GET /api/admin/reviews` — Query: `productId`, `page`, `limit` (default 20, max 100). Newest first. Response: `{ data: { items: [{ id, rating, comment, createdAt, product: { slug, title }, user: { email } }], page, limit, total } }`, rating-only reviews included. Schema: `adminListReviewsSchema`
+- `DELETE /api/admin/reviews/:id` — Response `204`. Recomputes the product's shown rating in the same transaction, also for a hidden product. Errors: `400`, `404`.
 
 ## Later
 - `GET/PUT/DELETE /api/wishlist`

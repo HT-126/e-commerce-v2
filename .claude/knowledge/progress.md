@@ -36,3 +36,10 @@ See `decisions.md` (not loaded every session). New decisions go there.
 - The 50-line bag limit is kept by the browser only (see `decisions.md`). A rare MySQL deadlock while paying gives a plain 500 (no retry).
 - A session that ends while the user is on `/account/orders` or a product page, or presses Pay, shows an error message, not a redirect to sign in. The guest "Sign in" link under a product's reviews drops the `#reviews` anchor.
 - "Write a review" shows on a delivered order's items even when the item is already reviewed or its product is now hidden.
+- Admin product form: when two admins edit the same product at once, the last save overwrites the other's edits to fields they did not touch (the form sends every field and the whole photo list).
+- Admin variants table: a stock box keeps the number it first showed, so if an order changes the stock meanwhile the box is out of date and Save turns on without the owner typing.
+- Two "Add variant" requests at the same moment can get the same display position (the order stays stable, sorted by id).
+- A server error that names one line of a list field (for example `highlights.2`) shows only the generic "Please check the form" toast.
+- The variants table has `role="alert"` on a table cell, which screen readers announce unevenly.
+- The main product photo can only be changed by retyping the photo addresses (there is no reordering).
+- Anything typed in the product form while a save is running is lost when the form resets to the saved values.

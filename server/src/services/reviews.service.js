@@ -55,6 +55,13 @@ export async function lockProduct(trx, slug) {
   return product.id;
 }
 
+// The same lock by id, for the admin: a review of a hidden product can still be deleted.
+export async function lockProductById(trx, productId) {
+  const product = await trx('products').where({ id: productId }).first('id').forUpdate();
+  if (!product) throw notFound();
+  return product.id;
+}
+
 // Only reviews with a comment are listed. Rating-only reviews count in the average, not here.
 export async function listReviews(slug, { page, limit }) {
   const productId = await findActiveProductId(slug);

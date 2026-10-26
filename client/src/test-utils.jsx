@@ -110,3 +110,12 @@ export const productCard = (overrides = {}) => ({
   soldOut: false,
   ...overrides,
 });
+
+// An order as the admin API returns it (api.md): the order plus the customer and the allowed changes.
+export const anAdminOrder = (overrides = {}) => ({
+  ...anOrder(),
+  email: 'anna@example.com',
+  customer: { id: 5, firstName: 'Anna', lastName: 'Kim' },
+  allowedStatuses: ['shipped', 'cancelled'],
+  ...overrides,
+});

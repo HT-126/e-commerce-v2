@@ -23,7 +23,7 @@ function toItem(row) {
 }
 
 // The order as the API returns it: read from the copy in `order_items`, never from the live product.
-async function loadOrder(conn, row) {
+export async function loadOrder(conn, row) {
   const items = await conn('order_items').where({ order_id: row.id }).orderBy('id');
   return {
     orderNumber: row.order_number,
