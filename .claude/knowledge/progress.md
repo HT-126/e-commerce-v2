@@ -13,10 +13,10 @@ Updated: 2026-10-26  |  Branch: main
 - MVP step 3, Accounts (`feature/accounts`, merged): register, login, logout, `/me`; JWT in an httpOnly cookie; rate limits; Account panel and Admin link.
 
 ## In progress
-- Nothing. `main` has everything merged and passing. Cart, Orders, Reviews and Admin are not pushed (`origin/main` is still `4dfa512`).
+- Nothing. `main` has everything merged and passing, and was pushed at `f12c46c` with CI green (client and server jobs). The commit that saves these notes (with the `jsconfig.json` fix) is not pushed yet.
 
 ## Next steps
-1. Push `main` (the owner does this) and check that CI is green. It has not run on Cart, Orders, Reviews or Admin.
+1. Push the latest commit (the owner does this). CI already passed on all 7 steps at `f12c46c`.
 2. The owner runs the Postman Orders, Reviews and Admin folders and the Cart, Orders, Reviews and Admin UI checklists, and reports problems.
 3. `/docker-app` (the owner types it): one command that runs the database, the API and the built client together. Then follow `deploy-checklist.md`.
 4. Delete the merged branches (`feature/accounts`, `cart`, `orders`, `reviews`, `admin`) once the owner agrees.
@@ -26,6 +26,7 @@ See `decisions.md` (not loaded every session). New decisions go there.
 
 ## Known issues
 - Product images are hotlinked from Shopify's CDN and may disappear one day.
+- CI (`.github/workflows`) shows a warning only: `actions/checkout@v4` and `actions/setup-node@v4` run on Node 20, which GitHub is retiring. Update them to a newer major when there is one.
 - Client linter is oxlint (Vite template default), not ESLint. Its config skips the generated `src/components/ui/` folder.
 - `npx shadcn add` also installs `cn` and `next-themes`, which are not approved: after adding a component remove both, import `cn` from `@/lib/utils` and drop `next-themes` from `sonner.jsx`, as was done for the current files.
 - Dev database: never run `npm run migrate:rollback` with a single batch (it drops every table). Use `npx knex migrate:down` for one step.
