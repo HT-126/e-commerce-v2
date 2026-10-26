@@ -58,7 +58,11 @@ Never connect v2 to the v1 container or database.
 - `docker-compose.yml` runs MySQL 8 (container `ecommerce_v2_mysql`, host port 3307 (v1 keeps 3306)) with a volume.
 - Two databases: `ecommerce_v2` (dev) and `ecommerce_v2_test` (tests). Create both in an init SQL file.
 - Service `app` (profile `app`, container `ecommerce_v2_app`, port 3002) runs the whole app from the root `Dockerfile` (3 stages on `node:22-alpine`, runs as the `node` user, about 280 MB). `docker compose --profile app up --build` starts it; plain `docker compose up -d` still starts only MySQL. It reads `server/.env` and overrides `NODE_ENV=production`, `DB_HOST=mysql`, `DB_PORT=3306`, `COOKIE_SECURE=false`. It uses the same database as `npm run dev`, and the two share port 3002, so only one runs at a time.
-- `server/scripts/docker-start.sh` is what the image runs: download the dataset (skipped if present), `knex migrate:latest`, `knex seed:run` (skips a database that has products), then the server. The dataset lives in the volume `seed_data` (`/app/server/db/data`).
+- `server/scripts/docker-start.sh` is what the image runs: `knex migrate:latest`, then, only when the catalog is empty (`scripts/catalog-state.js`), download the dataset (skipped if present) and `knex seed:run`, then the server. A filled database starts without any download. The dataset lives in the volume `seed_data` (`/app/server/db/data`).
+
+## Hosting (staging)
+- Staging: the app on Render (free Docker web service, built from the root `Dockerfile`) and the database on Aiven (free MySQL, TLS only). Cost $0. A free Render service sleeps after 15 minutes without visits and takes about a minute to wake, so this is for staging and demos, not production. Production hosting is not chosen yet. Check each host's current free-tier limits before relying on them.
+- Settings on the host: see "Staging on Render + Aiven" in `deploy-checklist.md`.
 - The server sends a content security policy that allows images from any `https` address (the photos live on `cdn.shopify.com` and `livostyle.com`), and "upgrade insecure requests" only when `COOKIE_SECURE` is true.
 
 ## Commands
@@ -84,4 +88,4 @@ Never connect v2 to the v1 container or database.
 Root `.env` (only for `docker-compose.yml`): `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` (the password of the app user `lumiere`; same value as `DB_PASSWORD`).
 
 Server: real values live in `server/.env` (never committed). Names are listed in `server/.env.example`:
-`PORT`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_NAME_TEST`, `JWT_SECRET` (at least 32 characters in production), `TRUST_PROXY` (optional, unset unless behind a proxy), `COOKIE_SECURE` (optional `true` or `false`; default true in production, false otherwise), `DEMO_CUSTOMER_EMAIL`, `DEMO_CUSTOMER_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`.
+`PORT`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_NAME_TEST`, `JWT_SECRET` (at least 32 characters in production), `DB_SSL` and `DB_SSL_CA` (optional; `DB_SSL=true` for a hosted database, with the CA text in `DB_SSL_CA`), `NODE_ENV` (set by Docker or the host; `DB_NAME_TEST` is not needed when it is `production`), `TRUST_PROXY` (optional, unset unless behind a proxy), `COOKIE_SECURE` (optional `true` or `false`; default true in production, false otherwise), `DEMO_CUSTOMER_EMAIL`, `DEMO_CUSTOMER_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`.

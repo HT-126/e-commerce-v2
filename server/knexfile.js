@@ -8,6 +8,8 @@ const connection = (database) => ({
   password: env.DB_PASSWORD,
   database,
   charset: 'utf8mb4',
+  // Only for a hosted database that wants an encrypted connection (DB_SSL=true, see config/env.js).
+  ...(env.DB_SSL_OPTIONS && { ssl: env.DB_SSL_OPTIONS }),
 });
 
 const base = {
