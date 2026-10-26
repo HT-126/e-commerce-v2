@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { db } from '../../src/db/knex.js';
+import { updateProduct } from '../../src/services/admin-products.service.js';
 import { cleanTables, createCategory, createProduct, createUser, login } from '../helpers/db.js';
 
 const app = createApp();
@@ -135,6 +136,20 @@ describe('POST /api/admin/products', () => {
     ['an ftp photo address', { images: [{ url: 'ftp://cdn.example/a.webp' }] }],
     ['21 highlights', { highlights: Array.from({ length: 21 }, (_, i) => `Line ${i}`) }],
     ['a material over 120 characters', { material: 'a'.repeat(121) }],
+    ['a price above $100,000.00', { priceCents: 10_000_001 }],
+    ['a slug over 160 characters', { slug: 'a'.repeat(161) }],
+    ['a highlight line over 200 characters', { highlights: ['a'.repeat(201)] }],
+    ['an empty highlight line', { highlights: ['ok', '  '] }],
+    ['a photo description over 255 characters', { images: [{ url: 'https://cdn.example/a.webp', alt: 'a'.repeat(256) }] }],
+    ['a photo address over 500 characters', { images: [{ url: `https://cdn.example/${'a'.repeat(500)}.webp` }] }],
+    ['a description over 5000 characters', { description: 'a'.repeat(5001) }],
+    ['a styling note over 1000 characters', { stylingNote: 'a'.repeat(1001) }],
+    ['sizing notes over 2000 characters', { sizingNotes: 'a'.repeat(2001) }],
+    ['a care text over 255 characters', { care: 'a'.repeat(256) }],
+    ['a category id that is a fraction', { categoryId: 1.5 }],
+    ['a category id sent as text', { categoryId: '3' }],
+    ['a category id of 0', { categoryId: 0 }],
+    ['a negative category id', { categoryId: -1 }],
   ];
   it.each(invalid)('rejects %s with 400', async (_name, change) => {
     const category = await createCategory();
@@ -144,6 +159,25 @@ describe('POST /api/admin/products', () => {
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
     expect(await db('products')).toEqual([]);
+  });
+
+  it('accepts the lowest and the highest price, and the longest slug, title and texts', async () => {
+    const category = await createCategory();
+    const edge = (overrides) => admin.post('/api/admin/products').send(validProduct(category.id, overrides));
+
+    const cheapest = await edge({ slug: 'cheapest', priceCents: 1 });
+    const dearest = await edge({ slug: 'dearest', priceCents: 10_000_000 });
+    const longest = await edge({
+      slug: 'a'.repeat(160),
+      title: 'a'.repeat(200),
+      description: 'a'.repeat(5000),
+      stylingNote: 'a'.repeat(1000),
+      sizingNotes: 'a'.repeat(2000),
+      highlights: Array.from({ length: 20 }, () => 'a'.repeat(200)),
+      images: [{ url: 'https://cdn.example/a.webp', alt: 'a'.repeat(255) }],
+    });
+
+    expect([cheapest.status, dearest.status, longest.status]).toEqual([201, 201, 201]);
   });
 
   it('trims text and saves an empty optional field as nothing', async () => {
@@ -265,7 +299,7 @@ describe('PATCH /api/admin/products/:id', () => {
     expect(await productRow(product.id)).toMatchObject({ title: 'Safe', price_cents: 3000 });
   });
 
-  it('rolls everything back when the photos are invalid, so the other fields are not saved either', async () => {
+  it('refuses the whole request when the photos are invalid, so the other fields are not saved either', async () => {
     const product = await createProduct({ title: 'Safe' });
 
     const res = await admin.patch(`/api/admin/products/${product.id}`).send({ title: 'Changed', images: [] });
@@ -273,6 +307,35 @@ describe('PATCH /api/admin/products/:id', () => {
     expect(res.status).toBe(400);
     expect((await productRow(product.id)).title).toBe('Safe');
     expect(await imagesOf(product.id)).toHaveLength(1);
+  });
+
+  // The test above is stopped by the validation, before any database work. This one goes under it: the service
+  // is called directly with a photo address the API would never let through, so the database itself refuses the
+  // photos (the column holds 500 characters) after the title was already changed, and everything must be undone.
+  it('rolls back the title and the old photos when the database cannot save the new photos', async () => {
+    const product = await createProduct({ title: 'Safe', images: [{ url: 'https://cdn.example/old.webp', alt: 'Old' }] });
+    const tooLong = `https://cdn.example/${'a'.repeat(600)}.webp`;
+
+    await expect(updateProduct(product.id, { title: 'Changed', images: [{ url: tooLong }] })).rejects.toThrow();
+
+    expect((await productRow(product.id)).title).toBe('Safe');
+    const photos = await imagesOf(product.id);
+    expect(photos.map((photo) => photo.url)).toEqual(['https://cdn.example/old.webp']);
+  });
+
+  it.each([
+    ['a price above $100,000.00', { priceCents: 10_000_001 }],
+    ['a slug over 160 characters', { slug: 'a'.repeat(161) }],
+    ['a photo description over 255 characters', { images: [{ url: 'https://cdn.example/a.webp', alt: 'a'.repeat(256) }] }],
+    ['a category id that is a fraction', { categoryId: 1.5 }],
+  ])('refuses %s on an update, and changes nothing', async (_name, change) => {
+    const product = await createProduct({ title: 'Safe', priceCents: 3000 });
+
+    const res = await admin.patch(`/api/admin/products/${product.id}`).send({ title: 'Changed', ...change });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(await productRow(product.id)).toMatchObject({ title: 'Safe', price_cents: 3000 });
   });
 
   it('answers 400 for a body with nothing in it', async () => {
@@ -454,6 +517,17 @@ describe('POST /api/admin/products/:id/variants', () => {
     expect(res.body.data.position).toBe(0);
   });
 
+  it('allows the biggest stock, 1,000,000', async () => {
+    const product = await createProduct({ variants: [] });
+
+    const res = await admin
+      .post(`/api/admin/products/${product.id}/variants`)
+      .send({ sku: 'BIG', color: 'Black', size: 'S', stock: 1_000_000 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.stock).toBe(1_000_000);
+  });
+
   it('allows a stock of 0 (shown as sold out)', async () => {
     const product = await createProduct({ variants: [] });
 
@@ -511,6 +585,8 @@ describe('POST /api/admin/products/:id/variants', () => {
     ['a SKU over 40 characters', { sku: 'a'.repeat(41) }],
     ['a blank color', { color: '' }],
     ['a size over 20 characters', { size: 'a'.repeat(21) }],
+    ['a color over 60 characters', { color: 'a'.repeat(61) }],
+    ['a stock above 1,000,000', { stock: 1_000_001 }],
   ])('rejects %s with 400', async (_name, change) => {
     const product = await createProduct({ variants: [] });
 

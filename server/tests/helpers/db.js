@@ -23,9 +23,10 @@ export async function cleanTables() {
 let counter = 0;
 const next = () => ++counter;
 
+// `position` is a small number column (at most 255), and `n` keeps counting up through a whole test file.
 export async function createCategory({ name, slug, position } = {}) {
   const n = next();
-  const row = { name: name ?? `Category ${n}`, slug: slug ?? `category-${n}`, position: position ?? n };
+  const row = { name: name ?? `Category ${n}`, slug: slug ?? `category-${n}`, position: position ?? n % 250 };
   const [id] = await db('categories').insert(row);
   return { id, ...row };
 }
