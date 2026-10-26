@@ -11,3 +11,5 @@ CLAUDE.local.md
 
 # Source dataset (about 30 MB). Download it with `npm run data:download` in server/
 server/db/data/products.json
+# The built client the Docker image serves (copied from client/dist). Never commit it.
+server/public/

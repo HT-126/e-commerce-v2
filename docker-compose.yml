@@ -1,5 +1,7 @@
 # MySQL for development and tests. Values come from the root .env (see .env.example).
 # Host port 3307, so v1 can keep 3306.
+# `docker compose up -d` starts only MySQL. `docker compose --profile app up --build` also builds and runs the
+# whole app (API and built client) on http://localhost:3002.
 services:
   mysql:
     image: mysql:8.0
@@ -22,5 +24,26 @@ services:
       timeout: 5s
       retries: 20
 
+  # The whole app, only with `--profile app`. It uses the same database as `npm run dev`, so stop the dev server
+  # first (both use port 3002).
+  app:
+    profiles: ["app"]
+    build: .
+    container_name: ecommerce_v2_app
+    env_file: server/.env
+    environment:
+      NODE_ENV: production
+      DB_HOST: mysql # the service name inside the Docker network
+      DB_PORT: "3306" # MySQL's port inside the network, not the host port 3307
+      COOKIE_SECURE: "false" # plain http on localhost
+    ports:
+      - "3002:3002"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - seed_data:/app/server/db/data # keeps the 30 MB dataset between runs
+
 volumes:
   mysql_data:
+  seed_data:

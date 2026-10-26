@@ -4,7 +4,7 @@ Never deploy to production without the user's explicit go-ahead. Staging first. 
 Hosting choices go in `stack.md` once decided. Check each host's current free-tier limits before choosing.
 
 ## Before any deploy
-- [ ] `docker compose --profile app up --build` works locally (see the `docker-app` skill)
+- [ ] `docker compose --profile app up --build` works locally (see the `docker-app` skill). This is the production-like local check before staging: it runs the same `NODE_ENV=production` build that is deployed. Real HTTPS hosting keeps `COOKIE_SECURE` unset (secure cookies); only the local Docker run turns it off.
 - [ ] On the branch to ship, working tree clean
 - [ ] Tests, lint and build pass
 - [ ] Every environment variable the app reads is listed in `.env.example`

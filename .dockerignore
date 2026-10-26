@@ -1,0 +1,15 @@
+# Nothing in this list goes into the image. Secrets come in at run time (env_file in docker-compose.yml).
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+.git
+client/dist
+coverage
+server/db/data
+server/public
+server/tests
+design
+postman
+.claude
+.github
