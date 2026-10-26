@@ -50,15 +50,19 @@ const aProduct = (overrides = {}) => ({
 // A fake API. `product`: what `GET /api/admin/products/7` returns (a status object for an error).
 // `save`: an answer for POST and PATCH of a product, instead of echoing it back.
 function renderPage({ url = '/admin/products/7', product = aProduct(), save, categoriesAnswer } = {}) {
+  // The product as the server holds it: a saved change is there for the next read.
+  let current = product;
   const fetchMock = stubApi((requested, init) => {
     if (requested === '/api/categories') return categoriesAnswer ?? { body: { data: categories } };
     if (requested === '/api/admin/products' && init?.method === 'POST') {
       return save ?? { status: 201, body: { data: aProduct({ ...JSON.parse(init.body), id: 9, categoryId: JSON.parse(init.body).categoryId, category: { name: 'Dresses', slug: 'dresses' }, variants: [] }) } };
     }
     if (requested === '/api/admin/products/7' && init?.method === 'PATCH') {
-      return save ?? { body: { data: { ...aProduct(), ...JSON.parse(init.body) } } };
+      if (save) return save;
+      current = { ...current, ...JSON.parse(init.body) };
+      return { body: { data: current } };
     }
-    if (requested.startsWith('/api/admin/products/')) return 'status' in product ? product : { body: { data: product } };
+    if (requested.startsWith('/api/admin/products/')) return 'status' in product ? product : { body: { data: current } };
     return { status: 404, body: { error: { message: 'Not found' } } };
   });
   render(
@@ -103,12 +107,13 @@ describe('admin ProductEditPage: a new product', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
-  it('shows a blank form, Active on, and one photo row', async () => {
+  it('shows a blank form and one photo row, with no control for showing or hiding it yet', async () => {
     renderPage({ url: '/admin/products/new' });
 
     expect(await screen.findByRole('heading', { name: 'New product' })).toBeInTheDocument();
     expect(field('Title')).toHaveValue('');
-    expect(screen.getByRole('switch', { name: 'Active (shown in the shop)' })).toBeChecked();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Hide from shop|Show in shop/ })).not.toBeInTheDocument();
     expect(screen.getAllByLabelText(/^Photo \d+ address$/)).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Create product' })).toBeInTheDocument();
     expect(screen.queryByText('Colors, sizes and stock')).not.toBeInTheDocument();
@@ -198,15 +203,14 @@ describe('admin ProductEditPage: a new product', () => {
     expect(screen.queryByRole('heading', { name: 'New product' })).not.toBeInTheDocument();
   });
 
-  it('can create a product that is not active', async () => {
+  it('creates the product shown in the shop', async () => {
     const fetchMock = renderPage({ url: '/admin/products/new' });
     await fillNewProduct();
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Active (shown in the shop)' }));
     fireEvent.click(save());
 
     await screen.findByText('Product created. Add its colors and sizes below.');
-    expect(bodyOf(writes(fetchMock, 'POST')[0]).isActive).toBe(false);
+    expect(bodyOf(writes(fetchMock, 'POST')[0]).isActive).toBe(true);
   });
 
   it('says under the slug when it is already used, and keeps everything typed', async () => {
@@ -275,7 +279,6 @@ describe('admin ProductEditPage: an existing product', () => {
     expect(field('Highlights')).toHaveValue('Breathable\nRelaxed fit');
     expect(field('Material')).toHaveValue('100% linen');
     expect(field('Photo 1 address')).toHaveValue('https://cdn.example/a.webp');
-    expect(screen.getByRole('switch', { name: 'Active (shown in the shop)' })).toBeChecked();
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent('Dresses'));
   });
 
@@ -319,7 +322,9 @@ describe('admin ProductEditPage: an existing product', () => {
     fireEvent.click(save());
 
     expect(await screen.findByText('Product saved')).toBeInTheDocument();
-    expect(bodyOf(writes(fetchMock, 'PATCH')[0])).toMatchObject({ priceCents: 6450, care: 'Wash cold', isActive: true });
+    expect(bodyOf(writes(fetchMock, 'PATCH')[0])).toMatchObject({ priceCents: 6450, care: 'Wash cold' });
+    // Showing or hiding the product is not saved with the form.
+    expect(bodyOf(writes(fetchMock, 'PATCH')[0])).not.toHaveProperty('isActive');
   });
 
   it('sends an emptied optional field as null, so it is cleared', async () => {
@@ -343,34 +348,83 @@ describe('admin ProductEditPage: an existing product', () => {
     expect(await screen.findByText('This slug is already used by another product')).toBeInTheDocument();
   });
 
-  describe('hiding the product', () => {
-    const hide = () => fireEvent.click(screen.getByRole('switch', { name: 'Active (shown in the shop)' }));
+  describe('hiding the product from the shop', () => {
+    const hideButton = () => screen.getByRole('button', { name: 'Hide from shop' });
 
-    it('asks first, and "Keep it active" sends nothing', async () => {
+    it('offers "Hide from shop" with a hint for a product that is shown', async () => {
+      renderPage();
+
+      expect(await screen.findByRole('button', { name: 'Hide from shop' })).toBeInTheDocument();
+      expect(screen.getByText(/Hidden products leave the shop but stay in old orders/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Show in shop' })).not.toBeInTheDocument();
+    });
+
+    it('offers "Show in shop" with a hint for a product that is hidden', async () => {
+      renderPage({ product: aProduct({ isActive: false }) });
+
+      expect(await screen.findByRole('button', { name: 'Show in shop' })).toBeInTheDocument();
+      expect(screen.getByText('This product is hidden from the shop. Customers cannot see or buy it.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Hide from shop' })).not.toBeInTheDocument();
+    });
+
+    it('has no status switch in the form any more', async () => {
+      renderPage();
+      await screen.findByRole('heading', { level: 1 });
+
+      expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    });
+
+    it('asks first, and "Keep it shown" sends nothing', async () => {
       const fetchMock = renderPage();
       await screen.findByRole('heading', { level: 1 });
 
-      hide();
-      fireEvent.click(save());
+      fireEvent.click(hideButton());
 
       const dialog = await screen.findByRole('alertdialog');
-      expect(within(dialog).getByText('Hide this product?')).toBeInTheDocument();
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Keep it active' }));
+      expect(within(dialog).getByText('Hide this product from the shop?')).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Keep it shown' }));
 
       await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
       expect(writes(fetchMock, 'PATCH')).toEqual([]);
+      expect(hideButton()).toBeInTheDocument();
     });
 
-    it('hides it after "Yes, hide product"', async () => {
+    it('hides it after "Yes, hide from shop", changing only the status, and the page shows it hidden', async () => {
       const fetchMock = renderPage();
       await screen.findByRole('heading', { level: 1 });
 
-      hide();
-      fireEvent.click(save());
-      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Yes, hide product' }));
+      fireEvent.click(hideButton());
+      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Yes, hide from shop' }));
 
-      expect(await screen.findByText('Product saved')).toBeInTheDocument();
-      expect(bodyOf(writes(fetchMock, 'PATCH')[0]).isActive).toBe(false);
+      expect(await screen.findByText('Product hidden from the shop')).toBeInTheDocument();
+      expect(bodyOf(writes(fetchMock, 'PATCH')[0])).toEqual({ isActive: false });
+      expect(await screen.findByRole('button', { name: 'Show in shop' })).toBeInTheDocument();
+      expect(screen.getByText('Hidden')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    });
+
+    it('shows a hidden product again at once, without asking', async () => {
+      const fetchMock = renderPage({ product: aProduct({ isActive: false }) });
+      await screen.findByRole('heading', { level: 1 });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Show in shop' }));
+
+      expect(await screen.findByText('Product is now shown in the shop')).toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(bodyOf(writes(fetchMock, 'PATCH')[0])).toEqual({ isActive: true });
+      expect(await screen.findByRole('button', { name: 'Hide from shop' })).toBeInTheDocument();
+    });
+
+    it('says so in a toast when it fails, and the product stays as it was', async () => {
+      renderPage({ save: failure });
+      await screen.findByRole('heading', { level: 1 });
+
+      fireEvent.click(hideButton());
+      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Yes, hide from shop' }));
+
+      expect(await screen.findByText('Could not change the product. Please try again.')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+      expect(hideButton()).toBeEnabled();
     });
 
     it('keeps the dialog open, showing "Working...", until the product is saved', async () => {
@@ -386,41 +440,29 @@ describe('admin ProductEditPage: an existing product', () => {
       });
       await screen.findByRole('heading', { level: 1 });
 
-      hide();
-      fireEvent.click(save());
-      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Yes, hide product' }));
+      fireEvent.click(hideButton());
+      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Yes, hide from shop' }));
 
       const dialog = await screen.findByRole('alertdialog');
       expect(await within(dialog).findByRole('button', { name: 'Working...' })).toBeDisabled();
       release();
-      expect(await screen.findByText('Product saved')).toBeInTheDocument();
+      expect(await screen.findByText('Product hidden from the shop')).toBeInTheDocument();
       await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     });
 
-    it('does not ask when other fields are saved and the product stays active', async () => {
-      renderPage();
+    it('is not undone by saving the form afterwards: the form never sends the status', async () => {
+      const fetchMock = renderPage();
       await screen.findByRole('heading', { level: 1 });
+      fireEvent.click(hideButton());
+      fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Yes, hide from shop' }));
+      await screen.findByRole('button', { name: 'Show in shop' });
 
-      fireEvent.change(field('Title'), { target: { value: 'New title' } });
+      fireEvent.change(field('Title'), { target: { value: 'Renamed while hidden' } });
       fireEvent.click(save());
 
-      expect(await screen.findByText('Product saved')).toBeInTheDocument();
-      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    });
-
-    it('does not ask to show a hidden product again, or to save one that stays hidden', async () => {
-      const fetchMock = renderPage({ product: aProduct({ isActive: false }) });
-      await screen.findByRole('heading', { level: 1 });
-
-      fireEvent.change(field('Title'), { target: { value: 'Still hidden' } });
-      fireEvent.click(save());
-      await screen.findByText('Product saved');
-      hide();
-      fireEvent.click(save());
       await waitFor(() => expect(writes(fetchMock, 'PATCH')).toHaveLength(2));
-
-      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-      expect(bodyOf(writes(fetchMock, 'PATCH')[1]).isActive).toBe(true);
+      expect(bodyOf(writes(fetchMock, 'PATCH')[1])).not.toHaveProperty('isActive');
+      expect(screen.getByRole('button', { name: 'Show in shop' })).toBeInTheDocument();
     });
   });
 });

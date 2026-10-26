@@ -22,6 +22,8 @@ export const splitLines = (text) =>
 const optionalText = (max) => z.string().max(max, `At most ${max} characters`);
 
 // The form keeps everything as text (that is what inputs hold). `toPayload` turns it into what the API wants.
+// Whether the product is shown in the shop is not a form field: it has its own button on the edit page, so an
+// old form can never save a stale status.
 export const productFormSchema = z.object({
   title: z.string().trim().min(1, 'Enter a title').max(200, 'At most 200 characters'),
   slug: z
@@ -36,7 +38,6 @@ export const productFormSchema = z.object({
     .trim()
     .regex(/^\d+(\.\d{1,2})?$/, 'Enter a price like 59.99')
     .refine((value) => Number(value) > 0, 'The price must be more than 0'),
-  isActive: z.boolean(),
   description: optionalText(5000),
   highlights: z
     .string()
@@ -72,7 +73,6 @@ export const EMPTY_PRODUCT = {
   slug: '',
   categoryId: '',
   price: '',
-  isActive: true,
   description: '',
   highlights: '',
   stylingNote: '',
@@ -113,7 +113,6 @@ export function toPayload(values) {
     slug: values.slug.trim(),
     categoryId: Number(values.categoryId),
     priceCents: dollarsToCents(values.price),
-    isActive: values.isActive,
     description: orNull(values.description),
     highlights: splitLines(values.highlights),
     stylingNote: orNull(values.stylingNote),
@@ -136,7 +135,6 @@ export function toFormValues(product) {
     slug: product.slug,
     categoryId: String(product.categoryId),
     price: centsToDollars(product.priceCents),
-    isActive: product.isActive,
     description: product.description ?? '',
     highlights: product.highlights.join('\n'),
     stylingNote: product.stylingNote ?? '',

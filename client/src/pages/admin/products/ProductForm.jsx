@@ -1,14 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useCreateProduct, useUpdateProduct } from '../../../hooks/use-admin-products.js';
 import { useCategories } from '../../../hooks/use-catalog.js';
@@ -57,9 +54,6 @@ export default function ProductForm({ product }) {
   const categories = useCategories();
   const create = useCreateProduct();
   const update = useUpdateProduct(product?.id);
-  // The values waiting for the owner to agree to hide the product.
-  const [hiding, setHiding] = useState(null);
-
   const {
     register,
     control,
@@ -98,7 +92,8 @@ export default function ProductForm({ product }) {
   async function persist(values) {
     try {
       const payload = toPayload(values);
-      const saved = isEdit ? await update.mutateAsync(payload) : await create.mutateAsync(payload);
+      // A new product is created shown in the shop. The edit page has the button to hide it.
+      const saved = isEdit ? await update.mutateAsync(payload) : await create.mutateAsync({ ...payload, isActive: true });
       if (isEdit) {
         toast.success('Product saved');
         reset(toFormValues(saved));
@@ -111,28 +106,10 @@ export default function ProductForm({ product }) {
     }
   }
 
-  // Hiding takes the product out of the shop, so it asks first.
-  async function save(values) {
-    if (isEdit && product.isActive && !values.isActive) {
-      setHiding(values);
-      return;
-    }
-    await persist(values);
-  }
-
-  // The dialog stays open, showing "Working...", until the product is saved.
-  async function confirmHide() {
-    try {
-      await persist(hiding);
-    } finally {
-      setHiding(null);
-    }
-  }
-
   const photosError = errors.images?.root?.message ?? errors.images?.message;
 
   return (
-    <form onSubmit={handleSubmit(save)} noValidate className="space-y-6">
+    <form onSubmit={handleSubmit(persist)} noValidate className="space-y-6">
       <Card title="Basics">
         <Field label="Title" htmlFor="title" error={errors.title?.message}>
           <Input id="title" aria-invalid={Boolean(errors.title)} {...titleField} />
@@ -183,16 +160,6 @@ export default function ProductForm({ product }) {
               {...register('price')}
             />
           </Field>
-        </div>
-        <div className="flex min-h-11 items-center gap-3">
-          <Controller
-            control={control}
-            name="isActive"
-            render={({ field }) => (
-              <Switch id="isActive" checked={field.value} onCheckedChange={field.onChange} />
-            )}
-          />
-          <Label htmlFor="isActive">Active (shown in the shop)</Label>
         </div>
       </Card>
 
@@ -297,16 +264,6 @@ export default function ProductForm({ product }) {
         </Button>
       </div>
 
-      <ConfirmDialog
-        open={Boolean(hiding)}
-        onOpenChange={(open) => !open && setHiding(null)}
-        title="Hide this product?"
-        description="It disappears from the shop and its page shows Not found. Old orders keep it. You can make it active again later."
-        confirmLabel="Yes, hide product"
-        cancelLabel="Keep it active"
-        pending={saving}
-        onConfirm={confirmHide}
-      />
     </form>
   );
 }

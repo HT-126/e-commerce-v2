@@ -139,11 +139,14 @@ describe('toPayload', () => {
       slug: 'linen-midi-dress',
       categoryId: 3,
       priceCents: 5999,
-      isActive: true,
       highlights: ['Breathable', 'Relaxed fit'],
       material: '100% linen',
       images: [{ url: 'https://cdn.example/a.webp', alt: 'Front' }],
     });
+  });
+
+  it('does not carry whether the product is shown in the shop: that has its own button', () => {
+    expect(toPayload(valid())).not.toHaveProperty('isActive');
   });
 
   it('sends an empty optional field as null, which clears it', () => {
@@ -184,12 +187,15 @@ describe('toFormValues', () => {
       slug: 'linen-midi-dress',
       categoryId: '3',
       price: '59.99',
-      isActive: false,
       highlights: 'Breathable\nRelaxed fit',
       stylingNote: 'Wear it with sandals',
       material: '100% linen',
       images: [{ url: 'https://cdn.example/a.webp', alt: '' }],
     });
+  });
+
+  it('does not put whether the product is shown in the shop into the form', () => {
+    expect(toFormValues(product)).not.toHaveProperty('isActive');
   });
 
   it('gives a form that is valid and goes back to the same payload', () => {

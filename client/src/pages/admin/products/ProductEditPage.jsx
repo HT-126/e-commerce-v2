@@ -3,6 +3,7 @@ import StatusBadge from '@/components/admin/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { useAdminProduct } from '../../../hooks/use-admin-products.js';
 import ProductForm from './ProductForm.jsx';
+import ProductVisibility from './ProductVisibility.jsx';
 import VariantsSection from './VariantsSection.jsx';
 
 // `/admin/products/new` has no id: a blank form. `/admin/products/:id` loads the product and shows its
@@ -72,6 +73,9 @@ export default function ProductEditPage() {
           See its reviews
         </Link>
       </p>
+      <div className="mt-4">
+        <ProductVisibility product={product} />
+      </div>
       <div className="mt-6 space-y-6">
         {/* `key` gives each product its own form, so the values of one never carry over to the next. */}
         <ProductForm key={product.id} product={product} />
