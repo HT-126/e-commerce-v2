@@ -26,11 +26,14 @@ export const useAdminProduct = (id, { enabled = true } = {}) =>
   });
 
 // A product, a price or a stock number changed here shows in the shop at once, so the shop's own product data
-// is asked for again too, and the admin's lists (their total stock and status).
+// is asked for again too, and the admin's lists (their total stock and status). The shop's filter options
+// (colors and sizes of active products, cached for 5 minutes) change when a product is hidden or a color or
+// size is added or renamed, so they are asked for again as well.
 function refreshProducts(queryClient) {
   queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
   queryClient.invalidateQueries({ queryKey: ['product'] });
   queryClient.invalidateQueries({ queryKey: ['products'] });
+  queryClient.invalidateQueries({ queryKey: ['filters'] });
 }
 
 // The server answers with the whole saved product, which goes straight into the cache.
