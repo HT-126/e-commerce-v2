@@ -6,9 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCreateVariant, useUpdateVariant } from '../../../hooks/use-admin-products.js';
 import { ApiError } from '../../../lib/api.js';
+import { MAX_STOCK } from './product-form.js';
 
-const WHOLE_NUMBER = /^\d{1,7}$/;
-const STOCK_MESSAGE = 'Stock must be a whole number, 0 or more.';
+const STOCK_MESSAGE = `Stock must be a whole number from 0 to ${MAX_STOCK.toLocaleString('en-US')}.`;
+
+// Digits only (no minus, no fraction), and not more than the API accepts.
+const isValidStock = (text) => /^\d+$/.test(text) && Number(text) <= MAX_STOCK;
 const TAKEN_MESSAGE = 'This product already has a variant with this color and size.';
 
 // What to tell the owner when the server refused a variant.
@@ -31,7 +34,7 @@ function VariantRow({ variant, productId }) {
 
   async function save() {
     setError(null);
-    if (!WHOLE_NUMBER.test(stock)) return setError(STOCK_MESSAGE);
+    if (!isValidStock(stock)) return setError(STOCK_MESSAGE);
     if (!color.trim() || !size.trim()) return setError('Color and size cannot be empty.');
 
     const changes = {};
@@ -98,7 +101,7 @@ function AddVariant({ productId }) {
   async function submit(event) {
     event.preventDefault();
     setError(null);
-    if (!WHOLE_NUMBER.test(values.stock)) return setError(STOCK_MESSAGE);
+    if (!isValidStock(values.stock)) return setError(STOCK_MESSAGE);
 
     try {
       await create.mutateAsync({

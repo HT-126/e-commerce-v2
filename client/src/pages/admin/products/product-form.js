@@ -1,6 +1,10 @@
 import { z } from 'zod';
+import { formatMoney } from '../../../lib/format-money.js';
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// The same limits as the API (api.md), so a number that is too big is explained under its field.
+export const MAX_PRICE_CENTS = 10_000_000;
+export const MAX_STOCK = 1_000_000;
 const MAX_PHOTOS = 10;
 const MAX_HIGHLIGHTS = 20;
 
@@ -37,7 +41,8 @@ export const productFormSchema = z.object({
     .string()
     .trim()
     .regex(/^\d+(\.\d{1,2})?$/, 'Enter a price like 59.99')
-    .refine((value) => Number(value) > 0, 'The price must be more than 0'),
+    .refine((value) => Number(value) > 0, 'The price must be more than 0')
+    .refine((value) => dollarsToCents(value) <= MAX_PRICE_CENTS, `The price can be at most ${formatMoney(MAX_PRICE_CENTS)}`),
   description: optionalText(5000),
   highlights: z
     .string()

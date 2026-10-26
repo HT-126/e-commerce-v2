@@ -105,14 +105,29 @@ describe('VariantsSection: the variants of a product', () => {
       ['letters', 'abc'],
       ['empty', ''],
       ['too long', '12345678'],
+      ['above the limit', '1000001'],
+      ['a huge number', '99999999999999999999'],
     ])('does not send a stock of %s, and says what is wrong', async (_name, value) => {
       const fetchMock = renderVariants([variant()]);
 
       fireEvent.change(stockBox(), { target: { value } });
       fireEvent.click(saveButton());
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('Stock must be a whole number, 0 or more.');
+      expect(await screen.findByRole('alert')).toHaveTextContent('Stock must be a whole number from 0 to 1,000,000.');
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('accepts a stock of exactly 1,000,000 and of 0', async () => {
+      const fetchMock = renderVariants([variant()]);
+
+      fireEvent.change(stockBox(), { target: { value: '1000000' } });
+      fireEvent.click(saveButton());
+      await screen.findByText('Variant saved');
+      fireEvent.change(stockBox(), { target: { value: '0' } });
+      fireEvent.click(saveButton());
+
+      await waitFor(() => expect(sent(fetchMock)).toHaveLength(2));
+      expect(sent(fetchMock).map(([, , body]) => body.stock)).toEqual([1000000, 0]);
     });
 
     it('does not send an empty color or size', async () => {
@@ -179,13 +194,23 @@ describe('VariantsSection: the variants of a product', () => {
       expect(screen.getByLabelText('Stock')).toHaveValue('0');
     });
 
-    it('does not send a stock that is not a whole number, 0 or more', async () => {
+    it('does not send a stock that is not a whole number from 0 to 1,000,000', async () => {
       const fetchMock = renderVariants([]);
 
       fill({ SKU: 'NEW-1', Color: 'Black', Size: 'M', Stock: '-3' });
       fireEvent.click(screen.getByRole('button', { name: 'Add variant' }));
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('Stock must be a whole number, 0 or more.');
+      expect(await screen.findByRole('alert')).toHaveTextContent('Stock must be a whole number from 0 to 1,000,000.');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('does not send a stock above 1,000,000', async () => {
+      const fetchMock = renderVariants([]);
+
+      fill({ SKU: 'NEW-1', Color: 'Black', Size: 'M', Stock: '1000001' });
+      fireEvent.click(screen.getByRole('button', { name: 'Add variant' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Stock must be a whole number from 0 to 1,000,000.');
       expect(fetchMock).not.toHaveBeenCalled();
     });
 

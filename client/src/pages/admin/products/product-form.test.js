@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_PRODUCT,
+  MAX_PRICE_CENTS,
+  MAX_STOCK,
   centsToDollars,
   dollarsToCents,
   formFieldFor,
@@ -88,6 +90,17 @@ describe('productFormSchema', () => {
     expect(errorsOf(valid())).toEqual({});
   });
 
+  it('accepts the lowest and the highest price the API allows', () => {
+    expect(errorsOf(valid({ price: '0.01' }))).toEqual({});
+    expect(errorsOf(valid({ price: '100000' }))).toEqual({});
+    expect(errorsOf(valid({ price: '100000.00' }))).toEqual({});
+  });
+
+  it('has the same limits as the API', () => {
+    expect(MAX_PRICE_CENTS).toBe(10_000_000);
+    expect(MAX_STOCK).toBe(1_000_000);
+  });
+
   it.each([
     ['a missing title', { title: '  ' }, 'title', 'Enter a title'],
     ['a title over 200 characters', { title: 'a'.repeat(201) }, 'title', 'At most 200 characters'],
@@ -101,6 +114,8 @@ describe('productFormSchema', () => {
     ['a price with 3 decimals', { price: '1.999' }, 'price', 'Enter a price like 59.99'],
     ['a negative price', { price: '-5' }, 'price', 'Enter a price like 59.99'],
     ['a price of 0', { price: '0.00' }, 'price', 'The price must be more than 0'],
+    ['a price above the limit', { price: '100000.01' }, 'price', 'The price can be at most $100,000.00'],
+    ['a huge price', { price: '99999999999999999999' }, 'price', 'The price can be at most $100,000.00'],
     ['a material over 120 characters', { material: 'a'.repeat(121) }, 'material', 'At most 120 characters'],
     ['21 highlight lines', { highlights: Array.from({ length: 21 }, (_, i) => `L${i}`).join('\n') }, 'highlights', 'At most 20 lines'],
     ['a highlight line over 200 characters', { highlights: 'a'.repeat(201) }, 'highlights', 'Each line can have at most 200 characters'],
