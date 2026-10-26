@@ -26,11 +26,12 @@ export function verifyToken(token) {
   }
 }
 
-// `Secure` (HTTPS only) in production. Takes the flag as an argument so a test can check both.
-export const cookieOptions = (production = env.NODE_ENV === 'production') => ({
+// `Secure` (HTTPS only) in production, unless COOKIE_SECURE says otherwise (see config/env.js). Takes the flag as
+// an argument so a test can check both.
+export const cookieOptions = (secure = env.COOKIE_SECURE) => ({
   httpOnly: true,
   sameSite: 'lax',
-  secure: production,
+  secure,
   path: '/',
 });
 

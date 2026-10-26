@@ -30,10 +30,19 @@ export function envProblems(vars) {
       'TRUST_PROXY must be a whole number (how many proxies are in front of the API), for example 1',
     );
   }
+  if (vars.COOKIE_SECURE && !['true', 'false'].includes(vars.COOKIE_SECURE)) {
+    problems.push('COOKIE_SECURE must be true or false');
+  }
   if (vars.NODE_ENV === 'production' && (vars.JWT_SECRET ?? '').length < 32) {
     problems.push('JWT_SECRET must be at least 32 characters in production');
   }
   return problems;
+}
+
+// `Secure` cookies are only sent over HTTPS. They are on in production, unless COOKIE_SECURE says otherwise: the
+// local Docker run is plain http://localhost and sets it to false. Pure, so a test can try it with plain objects.
+export function cookieSecure(vars) {
+  return vars.COOKIE_SECURE ? vars.COOKIE_SECURE === 'true' : vars.NODE_ENV === 'production';
 }
 
 const problems = envProblems(process.env);
@@ -52,6 +61,7 @@ export const env = {
   DB_NAME: process.env.DB_NAME,
   DB_NAME_TEST: process.env.DB_NAME_TEST,
   JWT_SECRET: process.env.JWT_SECRET,
+  COOKIE_SECURE: cookieSecure(process.env),
   // Number of proxies in front of the API. Unset unless there is one (see backend.md).
   TRUST_PROXY: process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : null,
 };

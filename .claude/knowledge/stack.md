@@ -38,8 +38,8 @@ No admin template (for example shadcn-admin): it is TypeScript and uses another 
 
 ## Client to server (cookies)
 - Dev: Vite proxies `/api` to `http://localhost:3002` (`server.proxy` in `vite.config.js`). The client always calls relative URLs like `/api/products`, so the cookie is same-origin and CORS is not needed in dev.
-- Production: serve the client and the API from the same domain (Express serves `client/dist`, or a reverse proxy). Then the cookie can stay `SameSite=Lax`.
-- Cookie: name `token`, `httpOnly`, `sameSite: 'lax'`, `secure` in production, `path: '/'`.
+- Production: serve the client and the API from the same domain. Express serves the built client from `server/public` when `NODE_ENV=production` and the folder exists (the Docker image puts `client/dist` there); otherwise the server answers the API only, for a client hosted elsewhere. Then the cookie can stay `SameSite=Lax`.
+- Cookie: name `token`, `httpOnly`, `sameSite: 'lax'`, `secure` in production (the setting `COOKIE_SECURE=true|false` overrides it; the local Docker run is plain http and sets false), `path: '/'`.
 
 ## Seed helper
 - `node-html-parser` (server **dependency**, not devDependency, so the Docker image can seed) parses `description_html` in the seed only.
@@ -57,11 +57,15 @@ Never connect v2 to the v1 container or database.
 ## Docker
 - `docker-compose.yml` runs MySQL 8 (container `ecommerce_v2_mysql`, host port 3307 (v1 keeps 3306)) with a volume.
 - Two databases: `ecommerce_v2` (dev) and `ecommerce_v2_test` (tests). Create both in an init SQL file.
+- Service `app` (profile `app`, container `ecommerce_v2_app`, port 3002) runs the whole app from the root `Dockerfile` (3 stages on `node:22-alpine`, runs as the `node` user, about 280 MB). `docker compose --profile app up --build` starts it; plain `docker compose up -d` still starts only MySQL. It reads `server/.env` and overrides `NODE_ENV=production`, `DB_HOST=mysql`, `DB_PORT=3306`, `COOKIE_SECURE=false`. It uses the same database as `npm run dev`, and the two share port 3002, so only one runs at a time.
+- `server/scripts/docker-start.sh` is what the image runs: download the dataset (skipped if present), `knex migrate:latest`, `knex seed:run` (skips a database that has products), then the server. The dataset lives in the volume `seed_data` (`/app/server/db/data`).
+- The server sends a content security policy that allows images from any `https` address (the photos live on `cdn.shopify.com` and `livostyle.com`), and "upgrade insecure requests" only when `COOKIE_SECURE` is true.
 
 ## Commands
 | Task | Command |
 |---|---|
 | Start database | `docker compose up -d` |
+| Run the whole app in Docker | `docker compose --profile app up --build` (http://localhost:3002; stop `npm run dev` first) |
 | Install | `npm install` in `client/` and `server/` |
 | Reset database (dev) | `npm run db:reset` in `server/` |
 | Download dataset | `npm run data:download` in `server/` (see `dataset.md`) |
@@ -80,4 +84,4 @@ Never connect v2 to the v1 container or database.
 Root `.env` (only for `docker-compose.yml`): `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` (the password of the app user `lumiere`; same value as `DB_PASSWORD`).
 
 Server: real values live in `server/.env` (never committed). Names are listed in `server/.env.example`:
-`PORT`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_NAME_TEST`, `JWT_SECRET`, `TRUST_PROXY` (optional, unset unless behind a proxy), `DEMO_CUSTOMER_EMAIL`, `DEMO_CUSTOMER_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`.
+`PORT`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_NAME_TEST`, `JWT_SECRET` (at least 32 characters in production), `TRUST_PROXY` (optional, unset unless behind a proxy), `COOKIE_SECURE` (optional `true` or `false`; default true in production, false otherwise), `DEMO_CUSTOMER_EMAIL`, `DEMO_CUSTOMER_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`.
