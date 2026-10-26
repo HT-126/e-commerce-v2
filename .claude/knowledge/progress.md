@@ -3,30 +3,31 @@
 Updated: 2026-10-26  |  Branch: main
 
 ## Current focus
-- All 7 MVP steps are built and merged. Next: push, check the owner's checklists, run with Docker, deploy.
+- All 7 MVP steps and the Docker run are built and merged. Next: the owner's checks, then deploy.
 
 ## Done
-- MVP step 7, Admin (`feature/admin`, merged `14c66aa`): everything under `/api/admin` is guarded once by `requireAdmin` (role read from the database). Products (list, create, edit with photo replace), variants (add, color, size, exact stock), orders (status changes with `allowedStatuses`; cancel gives the stock back once, order row locked), reviews (list, delete, rating recomputed). A lazy-loaded `/admin` area (shadcn/ui, TanStack Table v9 `DataTable`, product form, variants table, confirm dialogs, toasts). A product is hidden or shown with a button, never deleted; colors and sizes have no status (stock 0 shows Sold out). A `401 UNAUTHORIZED` from any request now turns the user into a guest, so a session that ended is sent to sign in. Verified on `main`: server 654 and client 589 tests, lint and build pass; two `code-reviewer` runs found no Must fix and their Should fix items are fixed. The owner saw the admin pages work. Not confirmed: the Postman Admin folder and the Admin UI checklist.
-- MVP step 6, Reviews (`feature/reviews`, merged `0760a52`): public list, write, edit and delete your own review; only a `delivered` order of the same user and product can review; the shown rating and count are recomputed in one transaction. Postman Reviews folder and Reviews UI checklist not confirmed.
-- MVP step 5, Pay and orders (`feature/orders`, merged `a172d79`): mock payment in one transaction, double Pay makes one order, order list and detail, confirmation and history pages. The owner confirmed Pay works. Postman Orders folder and Orders UI checklist not confirmed.
+- Docker run (`feature/docker-app`, merged `663fd14`): `docker compose --profile app up --build` runs the API and the built client in one container on `http://localhost:3002` (root `Dockerfile`, 3 stages on `node:22-alpine`, runs as `node`, 279 MB; `server/scripts/docker-start.sh` downloads the dataset, migrates, seeds when the catalog is empty, starts). In production the server serves `server/public` (page addresses get `index.html`; unknown `/api/*` stays a JSON 404). New optional `COOKIE_SECURE`; the security headers allow `https` photos. Plain `docker compose up -d` still starts only MySQL. Verified: logs, home page, deep link, API, restart skips the seed, `main` retested (server 680, client 589, lint, build, image rebuilds). Not checked: signing in over `http://localhost:3002` in a browser and the Postman Foundation folder against it.
+- MVP step 7, Admin (`feature/admin`, merged `14c66aa`): everything under `/api/admin` is guarded once by `requireAdmin`. Products (list, create, edit), variants (add, color, size, exact stock), orders (status changes; cancel gives the stock back once), reviews (list, delete). Lazy `/admin` area (shadcn/ui, TanStack Table v9). A product is hidden or shown with a button, never deleted; colors and sizes have no status (stock 0 shows Sold out). A `401 UNAUTHORIZED` from any request turns the user into a guest. Two `code-reviewer` runs found no Must fix. Not confirmed: the Postman Admin folder and the Admin UI checklist.
+- MVP step 6, Reviews (`feature/reviews`, merged `0760a52`): public list, write, edit and delete your own review; only a `delivered` order of the same user and product can review. Postman Reviews folder and Reviews UI checklist not confirmed.
+- MVP step 5, Pay and orders (`feature/orders`, merged `a172d79`): mock payment in one transaction, double Pay makes one order, order list and detail. The owner confirmed Pay works. Postman Orders folder and Orders UI checklist not confirmed.
 - MVP step 4, Cart (`feature/cart`, merged `3b446ec`): guest bag (50 lines max), signed-in bag, merge after sign in, Bag icon, `/cart`. Postman Cart folder run by the owner; Cart UI checklist not confirmed.
-- MVP step 3, Accounts (`feature/accounts`, merged): register, login, logout, `/me`; JWT in an httpOnly cookie; rate limits; Account panel and Admin link.
 
 ## In progress
-- Nothing. `main` has everything merged and passing, and was pushed at `f12c46c` with CI green (client and server jobs). The commit that saves these notes (with the `jsconfig.json` fix) is not pushed yet.
+- Nothing. `main` has everything merged and passing. GitHub has `main` up to `6e47fff` with CI green (client and server jobs). The Docker merge (`663fd14`) and the commit that saves these notes are not pushed yet.
 
 ## Next steps
-1. Push the latest commit (the owner does this). CI already passed on all 7 steps at `f12c46c`.
-2. The owner runs the Postman Orders, Reviews and Admin folders and the Cart, Orders, Reviews and Admin UI checklists, and reports problems.
-3. `/docker-app` (the owner types it): one command that runs the database, the API and the built client together. Then follow `deploy-checklist.md`.
-4. Delete the merged branches (`feature/accounts`, `cart`, `orders`, `reviews`, `admin`) once the owner agrees.
+1. Push `main` (the owner does this) and check that CI is green on the Docker work.
+2. The owner runs the Postman Orders, Reviews and Admin folders and the Cart, Orders, Reviews and Admin UI checklists, and signs in at `http://localhost:3002` once with the Docker app (stop `npm run dev` first), and reports problems.
+3. Follow `deploy-checklist.md`: staging first, then production, each only with the owner's go-ahead.
+4. Delete the merged branches (`feature/accounts`, `cart`, `orders`, `reviews`, `admin`, `docker-app`) once the owner agrees.
 
 ## Decisions
 See `decisions.md` (not loaded every session). New decisions go there.
 
 ## Known issues
 - Product images are hotlinked from Shopify's CDN and may disappear one day.
-- CI (`.github/workflows`) shows a warning only: `actions/checkout@v4` and `actions/setup-node@v4` run on Node 20, which GitHub is retiring. Update them to a newer major when there is one.
+- The Docker app uses the same MySQL and database (`ecommerce_v2`) as `npm run dev`, and both use port 3002, so run one at a time. `docker compose --profile app down -v` deletes the MySQL volume, which includes the dev database (the README says so). In production the server needs a `JWT_SECRET` of at least 32 characters.
+- CI does not build the Docker image. It also shows a warning only: `actions/checkout@v4` and `actions/setup-node@v4` run on Node 20, which GitHub is retiring; update them to a newer major when there is one.
 - Client linter is oxlint (Vite template default), not ESLint. Its config skips the generated `src/components/ui/` folder.
 - `npx shadcn add` also installs `cn` and `next-themes`, which are not approved: after adding a component remove both, import `cn` from `@/lib/utils` and drop `next-themes` from `sonner.jsx`, as was done for the current files.
 - Dev database: never run `npm run migrate:rollback` with a single batch (it drops every table). Use `npx knex migrate:down` for one step.
