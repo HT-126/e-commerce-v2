@@ -118,9 +118,21 @@ export default function ProductForm({ product }) {
           label="Slug"
           htmlFor="slug"
           error={errors.slug?.message}
-          hint="The end of the product's web address, like linen-midi-dress."
+          hint={
+            isEdit
+              ? 'Locked: old orders and shop links use this address.'
+              : "The end of the product's web address, like linen-midi-dress."
+          }
         >
-          <Input id="slug" aria-invalid={Boolean(errors.slug)} {...register('slug')} />
+          {/* Once a product exists its slug is fixed: old orders link to /products/<slug>, and a new slug would
+              make those links, and the "Write a review" link on them, open Not found. */}
+          <Input
+            id="slug"
+            readOnly={isEdit}
+            className={isEdit ? 'bg-muted text-muted-foreground' : undefined}
+            aria-invalid={Boolean(errors.slug)}
+            {...register('slug')}
+          />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Category" htmlFor="categoryId" error={errors.categoryId?.message}>
@@ -263,7 +275,6 @@ export default function ProductForm({ product }) {
           <Link to="/admin/products">Cancel</Link>
         </Button>
       </div>
-
     </form>
   );
 }

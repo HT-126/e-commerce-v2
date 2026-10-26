@@ -122,6 +122,8 @@ describe('admin ProductEditPage: a new product', () => {
   it('suggests the slug from the title, until the owner types in the slug', async () => {
     renderPage({ url: '/admin/products/new' });
     await screen.findByRole('heading', { name: 'New product' });
+    expect(field('Slug')).not.toHaveAttribute('readonly');
+    expect(screen.getByText(/The end of the product's web address/)).toBeInTheDocument();
 
     fireEvent.change(field('Title'), { target: { value: 'Linen Midi Dress!' } });
     expect(field('Slug')).toHaveValue('linen-midi-dress');
@@ -338,14 +340,32 @@ describe('admin ProductEditPage: an existing product', () => {
     expect(bodyOf(writes(fetchMock, 'PATCH')[0]).material).toBeNull();
   });
 
-  it('says under the slug when the new slug is already used', async () => {
-    renderPage({ save: apiError(409, 'SLUG_TAKEN') });
+  it('locks the slug of an existing product, with a short note under it', async () => {
+    renderPage();
     await screen.findByRole('heading', { level: 1 });
 
-    fireEvent.change(field('Slug'), { target: { value: 'taken-slug' } });
+    expect(field('Slug')).toHaveAttribute('readonly');
+    expect(screen.getByText('Locked: old orders and shop links use this address.')).toBeInTheDocument();
+  });
+
+  it('sends the slug unchanged when the product is saved', async () => {
+    const fetchMock = renderPage();
+    await screen.findByRole('heading', { level: 1 });
+
+    fireEvent.change(field('Title'), { target: { value: 'A New Title' } });
     fireEvent.click(save());
 
-    expect(await screen.findByText('This slug is already used by another product')).toBeInTheDocument();
+    await screen.findByText('Product saved');
+    expect(bodyOf(writes(fetchMock, 'PATCH')[0]).slug).toBe('linen-midi-dress');
+  });
+
+  it('shows not found for an id that is not a number, without asking the server', async () => {
+    const fetchMock = renderPage({ url: '/admin/products/abc' });
+
+    expect(await screen.findByRole('heading', { name: 'Product not found' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to products' })).toHaveAttribute('href', '/admin/products');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/admin/products/'))).toEqual([]);
   });
 
   describe('hiding the product from the shop', () => {

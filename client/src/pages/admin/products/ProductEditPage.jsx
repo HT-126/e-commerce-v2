@@ -11,12 +11,25 @@ import VariantsSection from './VariantsSection.jsx';
 export default function ProductEditPage() {
   const { id } = useParams();
   const isNew = id === undefined;
-  const { data: product, isPending, isError, error, refetch } = useAdminProduct(id, { enabled: !isNew });
+  // `/admin/products/abc` can only be a product that does not exist, so it is not even asked for.
+  const idIsNumber = isNew || /^\d+$/.test(id);
+  const { data: product, isPending, isError, error, refetch } = useAdminProduct(id, {
+    enabled: !isNew && idIsNumber,
+  });
 
   const back = (
     <Link to="/admin/products" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
       ← Products
     </Link>
+  );
+
+  const notFound = (
+    <section>
+      <h1 className="font-serif text-3xl">Product not found</h1>
+      <Link to="/admin/products" className="mt-4 inline-block underline underline-offset-4">
+        Back to products
+      </Link>
+    </section>
   );
 
   if (isNew) {
@@ -34,17 +47,9 @@ export default function ProductEditPage() {
     );
   }
 
+  if (!idIsNumber) return notFound;
   if (isPending) return <p role="status" className="text-muted-foreground">Loading...</p>;
-  if (isError && error.status === 404) {
-    return (
-      <section>
-        <h1 className="font-serif text-3xl">Product not found</h1>
-        <Link to="/admin/products" className="mt-4 inline-block underline underline-offset-4">
-          Back to products
-        </Link>
-      </section>
-    );
-  }
+  if (isError && error.status === 404) return notFound;
   if (isError) {
     return (
       <div role="alert" className="rounded-xl bg-card p-8 text-center">
