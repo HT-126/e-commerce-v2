@@ -149,34 +149,135 @@ MySQL 8, with the schema built only by Knex migrations.
 
 ## API design
 
-All routes are under `/api`, with JSON bodies and a session cookie. The full contract (every field, limit and error) is in `.claude/knowledge/api.md`.
+A JSON REST API under `/api`. Pages and API share one origin, so the session cookie is same-origin and no CORS setup is needed. This section is a summary; the full contract (every field, limit and error) is in `.claude/knowledge/api.md`, and `postman/` has a collection to try every route.
 
-| Area | Endpoints |
+### Conventions
+
+- **Success:** `{ "data": ... }`. **Failure:** `{ "error": { "message": "...", "code": "...", "details": [] } }`. `code` is one of a fixed list (below) and `details` is only there when it helps, for example the invalid fields of a form.
+- **Money** is always integer cents (`priceCents: 6299` is $62.99). **Dates** are ISO 8601 strings.
+- **Input** is checked with a Zod schema on every route that takes any. Bad input gets `400 VALIDATION_ERROR` before a service runs.
+- **Paging:** `page` and `limit`. A `limit` above the maximum is rejected with `400`, not silently cut.
+- **Prices and totals are computed on the server.** The browser only sends variant ids and quantities.
+- **Customer routes never return stock numbers.** A variant is shown as in stock or sold out. Only admin routes return exact stock.
+- **Admin:** one check guards the whole `/api/admin` path, so a new admin route cannot forget it.
+
+| Status | Code | Meaning |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Input failed its schema (`details` lists the problems) |
+| 400 | `CART_EMPTY`, `CART_NOT_READY` | Pay with an empty bag, or a line that is sold out or short of stock |
+| 400 | `INVALID_STATUS_CHANGE` | An admin tried an order status change that the rules do not allow |
+| 401 | `UNAUTHORIZED` | Not signed in, or the session ended |
+| 401 | `INVALID_CREDENTIALS` | Wrong email or password (the same message for both) |
+| 403 | `FORBIDDEN` | Signed in, but not an admin |
+| 403 | `NOT_PURCHASED` | Reviewing a product without a delivered order for it |
+| 404 | `NOT_FOUND` | Unknown or hidden product, or another user's order |
+| 409 | `EMAIL_TAKEN`, `SLUG_TAKEN`, `SKU_TAKEN`, `VARIANT_TAKEN` | Something that must be unique already exists |
+| 409 | `STOCK_CHANGED` | Not enough stock when paying (`details` lists the lines) |
+| 429 | `RATE_LIMITED` | Too many attempts; the response has `RateLimit` headers |
+
+### Auth
+
+The session is the cookie `token`: a JWT that holds only the user id, `httpOnly`, `SameSite=Lax`, `Secure` over HTTPS. It lasts 1 day, or 30 days with "remember me".
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `POST /api/auth/register` | no | Body `{ firstName, lastName, email, password, acceptTerms }`. Password 8 to 72 bytes. Creates a `customer`, signs in, `201`. `409 EMAIL_TAKEN`, `429` |
+| `POST /api/auth/login` | no | Body `{ email, password, remember? }`. Sets the cookie. A wrong email and a wrong password give the same `401`. `429` after 10 failed tries |
+| `POST /api/auth/logout` | yes | Clears the cookie, `204` |
+| `GET /api/auth/me` | yes | `{ id, firstName, lastName, email, role }`. The client calls it on load to know who is signed in |
+
+### Catalog
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `GET /api/categories` | no | The 8 categories in menu order |
+| `GET /api/filters` | no | The color groups and sizes that exist on active products, for the filter menus |
+| `GET /api/products` | no | A page of product cards. Query: `category` (slug), `q` (search in the title), `color` and `size` (comma lists), `minPriceCents`, `maxPriceCents`, `sort` (`newest`, `rating`, `price_asc`, `price_desc`), `page`, `limit` (default 12, max 48) |
+| `GET /api/products/:slug` | no | One product: photos, details, size chart, and its variants with `inStock`. `404` for a hidden product |
+| `GET /api/products/:slug/related` | no | Up to 4 products from the same category |
+
+- Color and size filters match **in-stock** variants only, on the same variant: "black" and "M" finds products that have a black M in stock.
+- Hidden products (`is_active = false`) never appear in lists, and their page is `404`.
+- The home tabs are plain queries: New arrivals is `sort=newest`, Top rated is `sort=rating`, Under $45 is `maxPriceCents=4499`.
+
+### Reviews
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `GET /api/products/:slug/reviews` | no | Reviews with a comment, newest first, with the author as "Anna K." |
+| `GET /api/products/:slug/reviews/mine` | yes | Your review (or `null`) and `canReview` |
+| `PUT /api/products/:slug/reviews/mine` | yes | Create or update your review: `{ rating: 1-5, comment? (max 1000) }`. `403 NOT_PURCHASED` unless you have a **delivered** order for the product. Returns the new `ratingAvg` and `reviewCount` |
+| `DELETE /api/products/:slug/reviews/mine` | yes | Delete your review and recompute the rating |
+
+One review per user and product. The shown rating is recomputed in the same transaction as every change.
+
+### Bag
+
+A guest's bag lives in the browser as `{ variantId, quantity }` pairs. The server prices it and never trusts a client price.
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `POST /api/cart/quote` | no | Prices a guest bag: `{ items: [{ variantId, quantity }] }` (up to 50 lines) |
+| `GET /api/cart` | yes | The signed-in user's bag, priced |
+| `PUT /api/cart/items/:variantId` | yes | Set one line's quantity (1 to 9); creates the line if needed |
+| `DELETE /api/cart/items/:variantId` | yes | Remove a line |
+| `POST /api/cart/merge` | yes | After sign-in: merge the guest bag into the account (the larger quantity per line wins) |
+
+Every route that returns a bag returns the same shape: the lines, `subtotalCents`, `shippingCents` (free from $97, else $6.95), `totalCents` and `canCheckout`. Each line has a `status`: `ok`, `not_enough` or `sold_out`. Only `ok` lines count in the totals, and `canCheckout` is true only when every line is `ok`.
+
+### Orders
+
+| Method and path | Auth | What it does |
+|---|---|---|
+| `POST /api/orders` | yes | **Pay.** Turns the signed-in user's bag into an order. No body. The payment is a mock and always succeeds, unless stock is short |
+| `GET /api/orders` | yes | Your orders, newest first, paged |
+| `GET /api/orders/:orderNumber` | yes | One of your orders. Someone else's order is `404` |
+
+Pay runs in **one database transaction**: lock the user's bag rows, check every line is `ok`, take the stock with a conditional update (`WHERE stock >= quantity`, in a fixed variant order so two orders can never wait on each other), create the order and a copy of its lines with status `paid`, and empty the bag. If any line fails, nothing changes. Because the bag rows are locked first, pressing Pay twice makes one order, and the second request gets `400 CART_EMPTY`.
+
+### Admin
+
+Every route here needs the `admin` role: `401` when signed out, `403` for a customer.
+
+| Method and path | What it does |
 |---|---|
-| Health | `GET /api/health` |
-| Auth | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` |
-| Catalog | `GET /api/categories`, `GET /api/filters`, `GET /api/products` (query: `category`, `q`, `color`, `size`, `minPriceCents`, `maxPriceCents`, `sort`, `page`, `limit`), `GET /api/products/:slug`, `GET /api/products/:slug/related` |
-| Reviews | `GET /api/products/:slug/reviews`, `GET`, `PUT` and `DELETE /api/products/:slug/reviews/mine` *(sign in; writing needs a delivered order)* |
-| Bag | `POST /api/cart/quote` *(public, prices a guest bag)*, `GET /api/cart`, `PUT` and `DELETE /api/cart/items/:variantId`, `POST /api/cart/merge` *(sign in)* |
-| Orders *(sign in)* | `POST /api/orders` (pay for the bag), `GET /api/orders`, `GET /api/orders/:orderNumber` |
-| Admin *(admin only)* | `/api/admin/products` (list, create, read, update; no delete), `/api/admin/products/:id/variants`, `PATCH /api/admin/variants/:id`, `/api/admin/orders` (list, read, change status), `/api/admin/reviews` (list, delete) |
+| `GET /api/admin/products` | List including hidden ones. Query: `q`, `category`, `active`, `sort`, `page`, `limit` (max 100). Shows variant count and total stock |
+| `GET /api/admin/products/:id` | One product with every variant and its exact stock |
+| `POST /api/admin/products` | Create a product (1 to 10 photos, a unique slug). It starts with no variants |
+| `PATCH /api/admin/products/:id` | Change any fields, including `isActive` to hide it from or show it in the shop. There is **no delete**: hiding keeps old orders intact |
+| `POST /api/admin/products/:id/variants` | Add a color and size with a SKU and a stock. `409` for a duplicate SKU or color and size |
+| `PATCH /api/admin/variants/:id` | Change the exact stock, color or size. To take a color or size off sale, set its stock to 0 |
+| `GET /api/admin/orders`, `GET /api/admin/orders/:orderNumber` | All customers' orders, filtered by status or searched by order number or email; the detail shows the customer and the `allowedStatuses` |
+| `PATCH /api/admin/orders/:orderNumber` | Change the status. Allowed: `paid` → `shipped` → `delivered`, and `paid` → `cancelled`. Anything else is `400 INVALID_STATUS_CHANGE`. Cancelling gives the stock back in the same transaction, once even if two requests arrive together |
+| `GET /api/admin/reviews`, `DELETE /api/admin/reviews/:id` | List and delete reviews; a delete recomputes the product's rating |
 
-Conventions:
-- Success is `{ "data": ... }`. Failure is `{ "error": { "message", "code", "details" } }`, where `code` is one of a fixed list such as `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `EMAIL_TAKEN`, `STOCK_CHANGED` or `RATE_LIMITED`.
-- Status codes: 200, 201, 204, 400 (bad input), 401 (not signed in), 403 (not allowed), 404, 409 (conflict, for example not enough stock), 429.
-- Prices and totals are always computed on the server. The browser only sends variant ids and quantities.
-- Lists are paged with `page` and `limit`, and the limits are validated, not silently cut.
-- Customer routes never return stock numbers. Only admin routes do.
-- Every `/api/admin` route is guarded once, in one place, so a new admin route cannot forget the check.
+### Examples
 
 ```bash
 # Dresses under $50, cheapest first
 curl "http://localhost:3002/api/products?category=dresses&maxPriceCents=5000&sort=price_asc"
 
-# Sign in, keep the cookie, read your bag
+# Sign in, keep the cookie, read the bag, then pay
 curl -c cookies.txt -H "Content-Type: application/json" \
   -d '{"email":"demo@example.com","password":"your-demo-password"}' http://localhost:3002/api/auth/login
 curl -b cookies.txt http://localhost:3002/api/cart
+curl -b cookies.txt -X POST http://localhost:3002/api/orders
+```
+
+A product card from the list (shortened):
+
+```json
+{ "data": { "items": [ { "id": 2242, "slug": "v-neck-satin-mini-dress-with-flowy-sleeves",
+    "title": "V-Neck Satin Mini Dress with Flowy Sleeves", "priceCents": 6299,
+    "ratingAvg": null, "reviewCount": 0, "soldOut": false } ],
+  "page": 1, "limit": 12, "total": 2242 } }
+```
+
+An error, for example paying when a size has just sold out (the ids are an example):
+
+```json
+{ "error": { "message": "Some items are no longer available in this quantity. Nothing was charged.", "code": "STOCK_CHANGED",
+    "details": [ { "variantId": 41, "title": "Satin Cowl Neck Ruched Sleeveless Dress", "color": "Light Blue", "size": "S" } ] } }
 ```
 
 ## Demo logins
@@ -186,7 +287,7 @@ On the live demo:
 | Role | Email | Password |
 |---|---|---|
 | Customer | `demo@gmail.com` | `123456` |
-| Admin | `admin@gmail.com` | `<ADMIN_PASSWORD>` |
+| Admin | `admin@gmail.com` | `123456` |
 
 The admin area is at `/admin` after signing in as the admin. The live demo is public and anyone can sign in, so please do not enter real personal data.
 
@@ -238,22 +339,6 @@ cd server && npm run dev   # http://localhost:3002
 cd client && npm run dev   # http://localhost:5174
 ```
 
-## Common problems
-
-| Problem | Cause and fix |
-|---|---|
-| `Missing environment variables: ...` and the server does not start | A required name is missing from `server/.env`. Copy `server/.env.example` and fill it in |
-| `ECONNREFUSED 127.0.0.1:3307` | MySQL is not running. Start it with `docker compose up -d` and check `docker compose ps` |
-| `Port 3002 already in use` | The Docker app and `npm run dev` both use port 3002. Stop one of them |
-| The server refuses to start in production | `JWT_SECRET` needs at least 32 characters |
-| A new route answers 404 in `npm run dev` | `node --watch` can miss a new file. Stop and start `npm run dev` in `server/` again |
-| The shop is empty | The seed did not run. Run `npm run db:reset` in `server/`, or start the Docker app, which seeds an empty database |
-| Signed in over `http://localhost:3002` but the session is lost | The cookie is `Secure` in production. `docker-compose.yml` sets `COOKIE_SECURE=false` for the local Docker run; keep that for plain http |
-| `Too many attempts` (429) | Rate limit: 10 failed sign-ins per 15 minutes (per IP and per email), 10 registers per hour. Restarting the server clears the counters |
-| `npm run db:reset` or `docker compose down -v` deleted my data | Both are meant to start again from nothing. To undo one migration step only, use `npx knex migrate:down` (never `migrate:rollback` with a single batch: it drops every table) |
-| Hosted database: connection or certificate error | Set `DB_SSL=true` and put the CA certificate in `DB_SSL_CA` on one line with line breaks written as `\n`, without quotes |
-| The live demo is slow on the first visit | Free hosting sleeps after 15 minutes without visits and takes about a minute to wake up |
-| Product photos do not load | They are hotlinked from Shopify's CDN (see Data below) |
 
 ## Tests
 
@@ -267,20 +352,6 @@ npm run build    # client only
 
 The server tests need the MySQL container running and use a separate database, `ecommerce_v2_test`, which is never the development one. At the time of writing there are 698 server tests and 589 client tests. The Postman collection in `postman/` is for manual API checks (see `postman/README.md`).
 
-## Security notes
-
-- Every route that takes input is validated with Zod, and bad input gets `400` before any service runs.
-- The session is a JWT in an `httpOnly`, `SameSite=Lax` cookie (`Secure` over HTTPS). The token holds only the user id, the algorithm is pinned to HS256, and its life matches the cookie (1 day, or 30 days with "remember me").
-- The role is never read from the token: the user is loaded from the database on every request, so a deleted user or a changed role takes effect at once.
-- Passwords are hashed with bcrypt and never returned or logged. A wrong email and a wrong password give the same message, and an unknown email still runs a bcrypt compare, so the response time does not reveal which accounts exist.
-- Rate limits on sign-in (per IP and per email, failed attempts only) and on register. The counters are in memory, per server process. `TRUST_PROXY` is set only behind a real proxy, because trusting `X-Forwarded-For` without one lets anyone fake their IP.
-- Every `/api/admin` route is guarded once by `requireAdmin`. A customer gets `403`, and someone signed out gets `401`.
-- A customer can only read their own orders (another user's order is `404`). Customer routes never return stock numbers.
-- Prices and totals come from the database, never from the browser. Stock changes use a conditional update inside a transaction, so two buyers cannot take the same last item.
-- Database queries go through Knex with bound values. A `%` or `_` typed in a search is matched as plain text.
-- `helmet` sets security headers with a content security policy. The only loosening is images from any `https` address, because the product photos live on other hosts.
-- The client builds no HTML from user text (no `dangerouslySetInnerHTML`), so a `<script>` in a review is shown, not run. The "go back after sign-in" address must be a path on this site.
-- Secrets live only in environment variables; `.env` files are never committed. `npm audit` on the production dependencies found no problems before the first deploy.
 
 ## Data
 
