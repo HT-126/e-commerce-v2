@@ -10,6 +10,21 @@ A full-stack online store for women's clothing, with a shop for customers and an
 
 Payment is a mock (no real money moves) and the store is a portfolio project, not a real shop.
 
+## Table of contents
+
+- [Screenshots](#screenshots)
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [Architecture](#architecture)
+- [Project structure](#project-structure)
+- [Database](#database)
+- [API design](#api-design)
+- [Demo logins](#demo-logins)
+- [Run locally](#run-locally)
+- [Tests](#tests)
+- [Data](#data)
+- [Project notes](#project-notes)
+
 ## Screenshots
 
 <table>
